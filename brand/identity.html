@@ -1,0 +1,532 @@
+<title>PlanSphere Identity</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Spline+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EEF3F7; --surface:#FFFFFF; --surface-2:#F6F9FB;
+  --ink:#071A2F; --ink-2:#33495F; --muted:#65809A; --line:#DAE4EC; --line-strong:#C3D3DF;
+  --link:#0E6E92;
+  --abyss:#051526; --deep:#0F3D63; --lagoon:#1FA9CE; --aurora:#7FE9D8; --node:#FF8A47;
+  --grid:rgba(31,169,206,.16);
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#05121E; --surface:#0A2032; --surface-2:#0D2739;
+    --ink:#E7F0F6; --ink-2:#BACDDB; --muted:#7D97AC; --line:#153347; --line-strong:#1E455F;
+    --link:#5FD4EB;
+    --grid:rgba(127,233,216,.14);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#05121E; --surface:#0A2032; --surface-2:#0D2739;
+  --ink:#E7F0F6; --ink-2:#BACDDB; --muted:#7D97AC; --line:#153347; --line-strong:#1E455F;
+  --link:#5FD4EB;
+  --grid:rgba(127,233,216,.14);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Spline Sans","Segoe UI",system-ui,sans-serif;
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.wordmark{font-family:Archivo,"Helvetica Neue",Arial,sans-serif; text-wrap:balance; margin:0}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+.wrap{max-width:1080px; margin:0 auto; padding:0 28px}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--lagoon); outline-offset:3px; border-radius:4px}
+
+/* ---------- hero: deliberately single-look night panel ---------- */
+.hero{
+  background:
+    radial-gradient(120% 90% at 22% 8%, rgba(47,166,200,.34) 0%, rgba(47,166,200,0) 58%),
+    radial-gradient(90% 70% at 88% 96%, rgba(255,138,71,.14) 0%, rgba(255,138,71,0) 60%),
+    linear-gradient(160deg,#0B2C49 0%,#06192C 52%,#030B16 100%);
+  color:#EAF6FB; padding:84px 0 76px; border-bottom:1px solid #0C2438;
+}
+.hero-inner{display:flex; flex-direction:column; align-items:center; text-align:center; gap:26px}
+.eyebrow{
+  font-size:11px; letter-spacing:.24em; text-transform:uppercase;
+  color:#6FA6C1; font-weight:500;
+}
+.hero-mark{width:clamp(140px,26vw,196px); height:auto; filter:drop-shadow(0 18px 44px rgba(3,17,32,.65))}
+.hero .wordmark{
+  font-size:clamp(2.6rem,9vw,5.1rem); letter-spacing:-.035em; line-height:.95; color:#F4FBFE;
+}
+.hero .wordmark .thin{font-weight:500}
+.hero .wordmark .bold{font-weight:700}
+.slogan{
+  font-size:11.5px; letter-spacing:.26em; text-transform:uppercase; color:#8FBCD3;
+  max-width:34ch; font-weight:500;
+}
+.hero-rule{width:52px; height:2px; background:var(--node); border-radius:2px}
+
+.traveler{opacity:0}
+@supports (offset-path: path("M0 0L1 1")){
+  .traveler{
+    offset-path:path("M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z");
+    offset-rotate:0deg; transform-box:fill-box; transform-origin:center;
+    animation:ps-travel 13s linear infinite;
+  }
+}
+@keyframes ps-travel{
+  0%{offset-distance:0%; opacity:0}
+  10%{opacity:0} 14%{opacity:1} 36%{opacity:1} 40%{opacity:0}
+  49%{opacity:0} 53%{opacity:1} 96%{opacity:1}
+  100%{offset-distance:100%; opacity:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .traveler{animation:none; offset-distance:70%; opacity:1}
+}
+
+/* ---------- sections ---------- */
+.band{padding:72px 0; border-bottom:1px solid var(--line)}
+.band:last-of-type{border-bottom:0}
+.head{display:flex; flex-direction:column; gap:10px; margin-bottom:38px; max-width:60ch}
+.head .kicker{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); font-weight:500}
+.head h2{font-size:clamp(1.6rem,3.4vw,2.15rem); font-weight:600; letter-spacing:-.025em}
+.head p{margin:0; color:var(--ink-2); font-size:1.02rem; max-width:62ch}
+
+.cols{display:grid; gap:26px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.note h3{font-size:1.02rem; font-weight:600; letter-spacing:-.01em; margin-bottom:6px}
+.note h3 .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--node); margin-right:9px; vertical-align:middle}
+.note p{margin:0; color:var(--ink-2); font-size:.95rem}
+
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px; display:flex; flex-direction:column; align-items:center; gap:18px;
+}
+.card .cap{font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
+.card .art{display:flex; align-items:center; justify-content:center; width:100%; min-height:110px}
+</style>
+<style>
+/* construction */
+.build{display:grid; gap:32px; grid-template-columns:minmax(260px,1fr) minmax(260px,1.05fr); align-items:center}
+@media (max-width:760px){.build{grid-template-columns:1fr}}
+.build-stage{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px; display:flex; justify-content:center;
+}
+.spec{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
+.spec li{display:flex; justify-content:space-between; gap:20px; padding:13px 0; border-bottom:1px solid var(--line)}
+.spec li:last-child{border-bottom:0}
+.spec .k{font-weight:500; font-size:.94rem}
+.spec .val{font-size:.86rem; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
+
+/* palette */
+.swatches{display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(158px,1fr))}
+.sw{border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--surface)}
+.sw .chip{height:88px}
+.sw .meta{padding:12px 13px 14px}
+.sw .nm{font-weight:600; font-size:.92rem; letter-spacing:-.01em}
+.sw .hex{font-size:.78rem; color:var(--muted); letter-spacing:.06em}
+.sw .use{font-size:.79rem; color:var(--ink-2); margin-top:7px; line-height:1.45}
+
+/* type */
+.type-row{
+  display:grid; gap:20px; grid-template-columns:132px 1fr; align-items:baseline;
+  padding:24px 0; border-bottom:1px solid var(--line);
+}
+.type-row:last-child{border-bottom:0}
+@media (max-width:640px){.type-row{grid-template-columns:1fr; gap:8px}}
+.type-role{font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
+.type-role em{display:block; color:var(--ink-2); letter-spacing:0; text-transform:none; font-size:.82rem; margin-top:6px; font-style:normal}
+.spec-archivo{font-family:Archivo,sans-serif; font-size:clamp(1.9rem,5vw,2.7rem); font-weight:600; letter-spacing:-.03em; line-height:1.12}
+.spec-body{font-size:1.04rem; color:var(--ink-2); max-width:56ch}
+.spec-mono{font-size:.95rem; letter-spacing:.05em; color:var(--ink-2)}
+
+/* in use */
+.usage{display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(238px,1fr))}
+.tile-shell{display:flex; flex-direction:column; align-items:center; gap:14px}
+.appicon{width:132px; height:132px; border-radius:29px; box-shadow:0 16px 34px rgba(6,26,44,.28)}
+.tabmock{
+  width:100%; max-width:330px; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:11px 11px 5px 5px; padding:9px 11px; display:flex; gap:9px; align-items:center;
+}
+.tabmock .fav{width:17px; height:17px; flex:none}
+.tabmock .ttl{font-size:.83rem; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.tabmock .x{margin-left:auto; color:var(--muted); font-size:.8rem}
+.sizes{display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap; justify-content:center}
+.sizes figure{margin:0; display:flex; flex-direction:column; align-items:center; gap:10px}
+.sizes figcaption{font-size:10.5px; color:var(--muted); letter-spacing:.1em}
+
+/* misuse */
+.dont{display:grid; gap:20px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.dont figure{margin:0; display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center}
+.dont .frame{
+  width:100%; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  padding:22px; display:flex; justify-content:center; position:relative; overflow:hidden;
+}
+.dont .frame::after{
+  content:""; position:absolute; right:12px; bottom:12px; width:19px; height:19px; border-radius:50%;
+  background:#D9432F;
+}
+.dont .frame::before{
+  content:""; position:absolute; right:16.5px; bottom:20.5px; width:10px; height:2.5px;
+  background:#fff; z-index:1; border-radius:2px;
+}
+.dont figcaption{font-size:.87rem; color:var(--ink-2); max-width:26ch}
+
+/* files */
+.files{border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--surface)}
+.files .row{display:flex; gap:18px; padding:14px 20px; border-bottom:1px solid var(--line); align-items:baseline}
+.files .row:last-child{border-bottom:0}
+.files .fn{font-size:.85rem; color:var(--ink); flex:none; min-width:17ch}
+.files .fd{font-size:.87rem; color:var(--muted)}
+@media (max-width:600px){.files .row{flex-direction:column; gap:4px}}
+.foot{padding:44px 0 60px; color:var(--muted); font-size:.84rem; letter-spacing:.06em}
+.knockout{stroke:var(--knock,#fff)}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <radialGradient id="psSphere" cx="35%" cy="28%" r="80%">
+    <stop offset="0" stop-color="#5FE0EC"/><stop offset=".38" stop-color="#1594B6"/><stop offset="1" stop-color="#08294A"/>
+  </radialGradient>
+  <linearGradient id="psFront" x1="60" y1="70" x2="120" y2="42" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#7FE9D8"/><stop offset="1" stop-color="#1FA9CE"/>
+  </linearGradient>
+  <linearGradient id="psBack" x1="8" y1="60" x2="66" y2="66" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#12456E"/><stop offset="1" stop-color="#1E86A8"/>
+  </linearGradient>
+  <clipPath id="psGlobe"><circle cx="64" cy="64" r="30"/></clipPath>
+  <mask id="psFrontHalf" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220">
+    <rect x="64" y="-40" width="136" height="220" fill="#fff"/>
+  </mask>
+  <path id="psOrbit" d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z"/>
+
+  <symbol id="psMark" viewBox="0 0 128 128">
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="url(#psBack)" stroke-width="5.5" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="30" fill="url(#psSphere)"/>
+    <g clip-path="url(#psGlobe)" fill="none" stroke="#CFF6FA" stroke-opacity=".26" stroke-width="1.1">
+      <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+      <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+    </g>
+    <circle cx="64" cy="64" r="30" fill="none" stroke="#07223C" stroke-opacity=".35" stroke-width="1"/>
+    <g clip-path="url(#psGlobe)"><g transform="rotate(-16 64 64)">
+      <use href="#psOrbit" fill="none" stroke="#062038" stroke-opacity=".5" stroke-width="11" stroke-linecap="round" mask="url(#psFrontHalf)"/>
+    </g></g>
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="url(#psFront)" stroke-width="6.2" stroke-linecap="round" mask="url(#psFrontHalf)"/></g>
+    <circle cx="64" cy="64" r="9.5" fill="#FF8A47" fill-opacity=".18"/>
+    <circle cx="64" cy="64" r="5.4" fill="#FF8A47"/>
+  </symbol>
+
+  <symbol id="psMarkSmall" viewBox="0 0 128 128">
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="#1B7CA0" stroke-width="8" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="32" fill="url(#psSphere)"/>
+    <g clip-path="url(#psGlobe)"><g transform="rotate(-16 64 64)">
+      <use href="#psOrbit" fill="none" stroke="#05203A" stroke-opacity=".55" stroke-width="14" stroke-linecap="round" mask="url(#psFrontHalf)"/>
+    </g></g>
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="#7FE9D8" stroke-width="8.5" stroke-linecap="round" mask="url(#psFrontHalf)"/></g>
+    <circle cx="64" cy="64" r="7" fill="#FF8A47"/>
+  </symbol>
+
+  <symbol id="psMarkMono" viewBox="0 0 128 128">
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="currentColor" stroke-opacity=".38" stroke-width="5.5" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="30" fill="currentColor" fill-opacity=".1"/>
+    <g clip-path="url(#psGlobe)" fill="none" stroke="currentColor" stroke-opacity=".32" stroke-width="1.1">
+      <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+      <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+    </g>
+    <circle cx="64" cy="64" r="30" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <g clip-path="url(#psGlobe)"><g transform="rotate(-16 64 64)">
+      <use href="#psOrbit" fill="none" class="knockout" stroke-width="11.5" stroke-linecap="round" mask="url(#psFrontHalf)"/>
+    </g></g>
+    <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="currentColor" stroke-width="6.2" stroke-linecap="round" mask="url(#psFrontHalf)"/></g>
+    <circle cx="64" cy="64" r="5.4" fill="currentColor"/>
+  </symbol>
+</defs></svg>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <p class="eyebrow mono">Identity system &nbsp;·&nbsp; v1.0</p>
+    <svg class="hero-mark" viewBox="0 0 128 128" role="img" aria-label="PlanSphere mark: an infinity-shaped route orbiting a sphere">
+      <use href="#psMark" width="128" height="128"/>
+      <g transform="rotate(-16 64 64)"><circle class="traveler" cx="0" cy="0" r="3.6" fill="#FFD3B0"/></g>
+    </svg>
+    <h1 class="wordmark"><span class="thin">Plan</span><span class="bold">Sphere</span></h1>
+    <div class="hero-rule"></div>
+    <p class="slogan mono">Plan Infinity and Travel Beyond the World</p>
+  </div>
+</header>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">The idea</p>
+    <h2>Three decisions, no ornament</h2>
+    <p>The name gives a sphere and the slogan gives infinity. Drawn together honestly, they stop being two symbols and become one object: an endless route around a whole world.</p>
+  </div>
+  <div class="cols">
+    <div class="note">
+      <h3><span class="dot" style="background:#1FA9CE"></span>A planet, not a map</h3>
+      <p>Meridians and latitudes, lit from the upper left. A flat map would tie PlanSphere to one region. A sphere says the whole world is in scope — which is what the slogan promises.</p>
+    </div>
+    <div class="note">
+      <h3><span class="dot" style="background:#7FE9D8"></span>A route that is also infinity</h3>
+      <p>The orbit traces a lemniscate. It passes <em>behind</em> the planet on the left and <em>across its face</em> on the right, so the figure-eight reads as a real path around a real world rather than an ∞ glued onto a globe.</p>
+    </div>
+    <div class="note">
+      <h3><span class="dot" style="background:#FF8A47"></span>One warm point</h3>
+      <p>Where the route crosses itself sits a single amber node: the trip being planned right now. It is the only warm colour in the system, so it is always the first thing the eye lands on.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Construction</p>
+    <h2>Built on a 16-unit grid</h2>
+    <p>The mark is drawn in a 128-unit square. Every measure below is a multiple of that grid, so the logo stays consistent whether it is embroidered on a cap or rendered at 20px in a nav bar.</p>
+  </div>
+  <div class="build">
+    <div class="build-stage">
+      <svg viewBox="0 0 192 192" width="100%" style="max-width:320px" role="img" aria-label="Construction grid showing the mark with clear space equal to a quarter of its height">
+        <defs>
+          <pattern id="pgrid" width="16" height="16" patternUnits="userSpaceOnUse">
+            <path d="M16 0H0V16" fill="none" style="stroke:var(--grid)" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <rect width="192" height="192" fill="url(#pgrid)"/>
+        <rect x="1" y="1" width="190" height="190" fill="none" style="stroke:var(--line-strong)" stroke-width="1" stroke-dasharray="5 5"/>
+        <rect x="32" y="32" width="128" height="128" fill="none" stroke="#1FA9CE" stroke-opacity=".38" stroke-width="1"/>
+        <use href="#psMark" x="32" y="32" width="128" height="128"/>
+        <g class="mono" font-size="9" style="fill:var(--muted)">
+          <line x1="4" y1="20" x2="28" y2="20" style="stroke:var(--muted)" stroke-width="1"/>
+          <text x="16" y="15" text-anchor="middle">x</text>
+          <line x1="20" y1="164" x2="20" y2="188" style="stroke:var(--muted)" stroke-width="1"/>
+          <text x="30" y="179">x</text>
+        </g>
+      </svg>
+    </div>
+    <ul class="spec">
+      <li><span class="k">Clear space, all sides</span><span class="val mono">x = ¼ of mark height</span></li>
+      <li><span class="k">Minimum size, mark</span><span class="val mono">20 px / 6 mm</span></li>
+      <li><span class="k">Minimum size, horizontal lockup</span><span class="val mono">96 px / 25 mm</span></li>
+      <li><span class="k">Orbit tilt</span><span class="val mono">−16°</span></li>
+      <li><span class="k">Sphere diameter</span><span class="val mono">60 of 128 units</span></li>
+      <li><span class="k">Node diameter</span><span class="val mono">10.8 units</span></li>
+      <li><span class="k">24 px and below, use</span><span class="val mono">plansphere-favicon.svg</span></li>
+    </ul>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Lockups</p>
+    <h2>Three arrangements, no others</h2>
+    <p>Pick by the space you have. Never rebuild a lockup by hand — the spacing between mark and wordmark is fixed at half the mark's width.</p>
+  </div>
+  <div class="cols">
+    <div class="card">
+      <div class="art">
+        <div style="display:flex; align-items:center; gap:18px">
+          <svg viewBox="0 0 128 128" width="62" height="62"><use href="#psMark" width="128" height="128"/></svg>
+          <span class="wordmark" style="font-size:2rem; letter-spacing:-.035em"><span style="font-weight:500">Plan</span><span style="font-weight:700">Sphere</span></span>
+        </div>
+      </div>
+      <span class="cap mono">Horizontal · default</span>
+    </div>
+    <div class="card">
+      <div class="art">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:12px">
+          <svg viewBox="0 0 128 128" width="64" height="64"><use href="#psMark" width="128" height="128"/></svg>
+          <span class="wordmark" style="font-size:1.6rem; letter-spacing:-.035em"><span style="font-weight:500">Plan</span><span style="font-weight:700">Sphere</span></span>
+          <span class="mono" style="font-size:8.5px; letter-spacing:.22em; color:var(--muted)">PLAN INFINITY AND TRAVEL BEYOND THE WORLD</span>
+        </div>
+      </div>
+      <span class="cap mono">Stacked · with slogan</span>
+    </div>
+    <div class="card">
+      <div class="art">
+        <svg viewBox="0 0 128 128" width="88" height="88"><use href="#psMark" width="128" height="128"/></svg>
+      </div>
+      <span class="cap mono">Mark alone · avatars, tiles</span>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">One colour</p>
+    <h2>It has to survive a rubber stamp</h2>
+    <p>Gradients are a luxury. The single-colour cut keeps the over-and-under weave by knocking the front strand out of the sphere, so the orbit still reads in one ink.</p>
+  </div>
+  <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+    <div class="card" style="--knock:var(--surface); color:var(--ink)">
+      <div class="art"><svg viewBox="0 0 128 128" width="92" height="92"><use href="#psMarkMono" width="128" height="128"/></svg></div>
+      <span class="cap mono">Ink on light</span>
+    </div>
+    <div class="card" style="background:#06182B; border-color:#123049; --knock:#06182B; color:#FFFFFF">
+      <div class="art"><svg viewBox="0 0 128 128" width="92" height="92"><use href="#psMarkMono" width="128" height="128"/></svg></div>
+      <span class="cap mono" style="color:#7FA3BC">Reversed on dark</span>
+    </div>
+    <div class="card" style="--knock:var(--surface); color:#0F3D63">
+      <div class="art"><svg viewBox="0 0 128 128" width="92" height="92"><use href="#psMarkMono" width="128" height="128"/></svg></div>
+      <span class="cap mono">Deep Sea, single ink</span>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Colour</p>
+    <h2>Dusk from a window seat</h2>
+    <p>A cold, deep range for the world and the route; one warm accent for the traveller. The warmth is rationed on purpose — Sunset should never cover more than about 5% of a surface.</p>
+  </div>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#051526"></div><div class="meta"><div class="nm">Abyss</div><div class="hex mono">#051526</div><div class="use">Night grounds, app tile, hero panels.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#0F3D63"></div><div class="meta"><div class="nm">Deep Sea</div><div class="hex mono">#0F3D63</div><div class="use">Headings on light, the orbit's shadow side.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#1FA9CE"></div><div class="meta"><div class="nm">Lagoon</div><div class="hex mono">#1FA9CE</div><div class="use">Primary brand colour. Active states, links.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#7FE9D8"></div><div class="meta"><div class="nm">Aurora</div><div class="hex mono">#7FE9D8</div><div class="use">Route highlight, charts, confirmations.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#FF8A47"></div><div class="meta"><div class="nm">Sunset</div><div class="hex mono">#FF8A47</div><div class="use">The node. Accent only — never a background.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#EEF3F7; border-bottom:1px solid #DAE4EC"></div><div class="meta"><div class="nm">Cirrus</div><div class="hex mono">#EEF3F7</div><div class="use">Light ground. Blue-biased, never neutral grey.</div></div></div>
+    <div class="sw"><div class="chip" style="background:#071A2F"></div><div class="meta"><div class="nm">Ink</div><div class="hex mono">#071A2F</div><div class="use">Body text on light grounds.</div></div></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Typography</p>
+    <h2>Wayfinding, not marketing</h2>
+    <p>Archivo comes out of signage lettering, which is exactly the voice an itinerary wants: legible at a glance, sturdy when set large and tight. Plex Mono handles everything with a time or a code attached.</p>
+  </div>
+  <div class="type-row">
+    <div class="type-role">Archivo<em>Wordmark &amp; headings · 500 / 600 / 700</em></div>
+    <div>
+      <div class="spec-archivo">Kyoto in eleven days</div>
+      <div class="mono" style="font-size:.78rem; color:var(--muted); margin-top:10px; letter-spacing:.1em">−0.03em TRACKING AT DISPLAY SIZES</div>
+    </div>
+  </div>
+  <div class="type-row">
+    <div class="type-role">Spline Sans<em>Body &amp; interface · 400 / 500 / 600</em></div>
+    <div class="spec-body">Add a stop, drag it up the day, and every booking after it moves with you. PlanSphere keeps the trip in one place — flights, stays, the walk between them — so the plan stays true while it changes.</div>
+  </div>
+  <div class="type-row">
+    <div class="type-role">IBM Plex Mono<em>Times, codes, coordinates · 400 / 500</em></div>
+    <div class="spec-mono">KUL&nbsp;→&nbsp;KIX &nbsp; 23:55 · 07:20+1 &nbsp; MH052 &nbsp; 35.0116°N 135.7681°E</div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">In use</p>
+    <h2>Where it actually has to work</h2>
+    <p>The mark was drawn small first. At favicon sizes the grid lines and the shadow are dropped and the strokes thicken — that is a separate file, not a scaled-down primary.</p>
+  </div>
+  <div class="usage">
+    <div class="tile-shell">
+      <svg class="appicon" viewBox="0 0 512 512" role="img" aria-label="PlanSphere app icon">
+        <defs>
+          <linearGradient id="tileG" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#123A5E"/><stop offset=".55" stop-color="#07223C"/><stop offset="1" stop-color="#040E1B"/>
+          </linearGradient>
+          <radialGradient id="tileGlow" cx="26%" cy="18%" r="70%">
+            <stop offset="0" stop-color="#2FA6C8" stop-opacity=".45"/><stop offset="1" stop-color="#2FA6C8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="512" height="512" rx="114" fill="url(#tileG)"/>
+        <rect width="512" height="512" rx="114" fill="url(#tileGlow)"/>
+        <use href="#psMark" x="83" y="83" width="346" height="346"/>
+      </svg>
+      <span class="cap mono" style="font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)">App tile · 512</span>
+    </div>
+    <div class="tile-shell">
+      <div class="tabmock">
+        <svg class="fav" viewBox="0 0 128 128" aria-hidden="true"><use href="#psMarkSmall" width="128" height="128"/></svg>
+        <span class="ttl">PlanSphere — Kyoto, 11 days</span>
+        <span class="x">✕</span>
+      </div>
+      <span class="cap mono" style="font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)">Browser tab</span>
+    </div>
+    <div class="tile-shell">
+      <div class="sizes">
+        <figure><svg viewBox="0 0 128 128" width="48" height="48"><use href="#psMarkSmall" width="128" height="128"/></svg><figcaption class="mono">48</figcaption></figure>
+        <figure><svg viewBox="0 0 128 128" width="32" height="32"><use href="#psMarkSmall" width="128" height="128"/></svg><figcaption class="mono">32</figcaption></figure>
+        <figure><svg viewBox="0 0 128 128" width="24" height="24"><use href="#psMarkSmall" width="128" height="128"/></svg><figcaption class="mono">24</figcaption></figure>
+        <figure><svg viewBox="0 0 128 128" width="16" height="16"><use href="#psMarkSmall" width="128" height="128"/></svg><figcaption class="mono">16</figcaption></figure>
+      </div>
+      <span class="cap mono" style="font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)">Small-size cut</span>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Misuse</p>
+    <h2>Four ways to break it</h2>
+    <p>The weave only holds if the geometry holds. Each of these quietly destroys the thing that makes the mark work.</p>
+  </div>
+  <div class="dont">
+    <figure>
+      <div class="frame"><svg viewBox="0 0 128 128" width="74" height="74" style="transform:scaleX(1.4)"><use href="#psMark" width="128" height="128"/></svg></div>
+      <figcaption>Don't stretch it. The sphere stops being a sphere.</figcaption>
+    </figure>
+    <figure>
+      <div class="frame"><svg viewBox="0 0 128 128" width="74" height="74" style="filter:hue-rotate(118deg) saturate(1.35)"><use href="#psMark" width="128" height="128"/></svg></div>
+      <figcaption>Don't recolour it. The palette is fixed, node included.</figcaption>
+    </figure>
+    <figure>
+      <div class="frame"><svg viewBox="0 0 128 128" width="74" height="74" style="transform:rotate(24deg)"><use href="#psMark" width="128" height="128"/></svg></div>
+      <figcaption>Don't rotate it. The −16° tilt is already in the artwork.</figcaption>
+    </figure>
+    <figure>
+      <div class="frame"><span class="wordmark" style="font-size:1.5rem; font-weight:700; letter-spacing:-.03em; color:transparent; -webkit-text-stroke:1.5px var(--ink); text-shadow:2px 3px 0 #FF8A47">PlanSphere</span></div>
+      <figcaption>Don't outline or shadow the wordmark. Two weights, one colour.</figcaption>
+    </figure>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Also explored</p>
+    <h2>Two directions on the table</h2>
+    <p>Kept as siblings rather than rejects — both are drawn from the same geometry, and either can serve where the primary is impractical.</p>
+  </div>
+  <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+    <div class="card">
+      <div class="art">
+        <svg viewBox="0 0 128 128" width="104" height="104" role="img" aria-label="Meridian P monogram">
+          <defs><linearGradient id="altA" x1="42" y1="80" x2="96" y2="26" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1FA9CE"/><stop offset="1" stop-color="#7FE9D8"/></linearGradient></defs>
+          <rect x="28" y="22" width="12" height="84" rx="6" fill="#0F3D63"/>
+          <circle cx="68" cy="52" r="26" fill="none" stroke="url(#altA)" stroke-width="12"/>
+          <path d="M50 52Q68 61 86 52" fill="none" stroke="#0F3D63" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="68" cy="52" r="6" fill="#FF8A47"/>
+        </svg>
+      </div>
+      <span class="cap mono">Meridian P</span>
+      <p style="margin:0; font-size:.88rem; color:var(--ink-2); text-align:center">A monogram for square crops and merchandise, where a full orbit would crowd the frame.</p>
+    </div>
+    <div class="card">
+      <div class="art">
+        <svg viewBox="0 0 128 128" width="118" height="118" role="img" aria-label="Flight Eight line mark">
+          <defs><linearGradient id="altB" x1="10" y1="80" x2="118" y2="40" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0F3D63"/><stop offset=".55" stop-color="#1FA9CE"/><stop offset="1" stop-color="#7FE9D8"/></linearGradient></defs>
+          <g transform="rotate(-16 64 64)"><use href="#psOrbit" fill="none" stroke="url(#altB)" stroke-width="7" stroke-linecap="round"/></g>
+          <circle cx="64" cy="64" r="6.4" fill="#FF8A47"/>
+        </svg>
+      </div>
+      <span class="cap mono">Flight Eight</span>
+      <p style="margin:0; font-size:.88rem; color:var(--ink-2); text-align:center">The route on its own — a watermark, a loading state, a repeat pattern for boarding passes and packaging.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <p class="kicker mono">Files</p>
+    <h2>What's in the folder</h2>
+    <p>All vector, all self-contained. Text in the lockups is live — outline it before sending anything to a printer.</p>
+  </div>
+  <div class="files">
+    <div class="row"><span class="fn mono">plansphere-mark.svg</span><span class="fd">Primary mark. Avatars, app chrome, anywhere the name already appears.</span></div>
+    <div class="row"><span class="fn mono">plansphere-lockup-horizontal.svg</span><span class="fd">Default lockup. Site header, email signature, decks.</span></div>
+    <div class="row"><span class="fn mono">plansphere-lockup-stacked.svg</span><span class="fd">Centred lockup with slogan. Splash screens, print, merch.</span></div>
+    <div class="row"><span class="fn mono">plansphere-mono-ink.svg</span><span class="fd">Single colour on light grounds. Stamps, embroidery, fax-grade output.</span></div>
+    <div class="row"><span class="fn mono">plansphere-mono-reverse.svg</span><span class="fd">Single colour on dark grounds.</span></div>
+    <div class="row"><span class="fn mono">plansphere-appicon.svg</span><span class="fd">512 × 512 app tile with the night ground baked in.</span></div>
+    <div class="row"><span class="fn mono">plansphere-favicon.svg</span><span class="fd">24px and below. Grid lines removed, strokes thickened.</span></div>
+    <div class="row"><span class="fn mono">README.md</span><span class="fd">Colour values, type stack, and the rules in plain text.</span></div>
+  </div>
+</div></section>
+
+<footer class="wrap foot mono">PLANSPHERE · IDENTITY V1.0 · PLAN INFINITY AND TRAVEL BEYOND THE WORLD</footer>

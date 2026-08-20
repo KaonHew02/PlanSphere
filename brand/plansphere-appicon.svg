@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="PlanSphere app icon">
+  <title>PlanSphere app icon</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#123A5E"/><stop offset="0.55" stop-color="#07223C"/><stop offset="1" stop-color="#040E1B"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="26%" cy="18%" r="70%">
+      <stop offset="0" stop-color="#2FA6C8" stop-opacity="0.45"/><stop offset="1" stop-color="#2FA6C8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sphere" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#5FE0EC"/><stop offset="0.38" stop-color="#1594B6"/><stop offset="1" stop-color="#08294A"/></radialGradient>
+    <linearGradient id="front" x1="150" y1="200" x2="330" y2="110" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9CF3E2"/><stop offset="1" stop-color="#1FA9CE"/></linearGradient>
+    <linearGradient id="back" x1="20" y1="170" x2="180" y2="180" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#15517F"/><stop offset="1" stop-color="#2394BA"/></linearGradient>
+    <clipPath id="globe"><circle cx="64" cy="64" r="30"/></clipPath>
+    <mask id="fronthalf" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220"><rect x="64" y="-40" width="136" height="220" fill="#fff"/></mask>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#tile)"/>
+  <rect width="512" height="512" rx="114" fill="url(#glow)"/>
+  <g transform="translate(83.2 83.2) scale(2.7)">
+    <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="url(#back)" stroke-width="5.5" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="30" fill="url(#sphere)"/>
+    <g clip-path="url(#globe)" fill="none" stroke="#CFF6FA" stroke-opacity="0.26" stroke-width="1.1">
+      <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+      <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+    </g>
+    <g clip-path="url(#globe)"><g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#041729" stroke-opacity="0.55" stroke-width="11" stroke-linecap="round" mask="url(#fronthalf)"/></g></g>
+    <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="url(#front)" stroke-width="6.2" stroke-linecap="round" mask="url(#fronthalf)"/></g>
+    <circle cx="64" cy="64" r="10" fill="#FF8A47" fill-opacity="0.2"/>
+    <circle cx="64" cy="64" r="5.4" fill="#FF8A47"/>
+  </g>
+</svg>

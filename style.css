@@ -1,0 +1,1551 @@
+/* ==========================================================================
+   PlanSphere — design tokens
+
+   The layout is MoneyFlow's, because it earned it: a sidebar of modules, a
+   quiet top bar, one hero band answering the single question the screen
+   exists for, and cards down a stack. What changes is the world it is set
+   in. MoneyFlow is jade on sage-white; PlanSphere is deep water — azure on a
+   blue-cast paper, because the identity is a planet and an orbit and the
+   whole app is about being somewhere else.
+
+   Azure is the brand and every live control. Lagoon is the accent that only
+   ever highlights — it is too light to carry white text, which is exactly
+   why it stays a graphic colour and never a button. Sunset is rationed to
+   one thing: the trip you are on or about to take.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   `hidden` has to actually hide. The browser's own rule is a bare attribute
+   selector, which any class here outranks — and half these classes set
+   `display`. Nothing should out-argue an element being hidden.
+   -------------------------------------------------------------------------- */
+[hidden] { display: none !important; }
+
+:root {
+    color-scheme: light;
+
+    --canvas:      #f1f5fb;   /* the page: white with enough blue in it to be a colour */
+    --paper:       #ffffff;
+    --paper-2:     #f7faff;   /* nested rows, sitting inside a card */
+
+    --ink:         #0f294d;   /* deep navy, not black */
+    --ink-2:       #46628a;
+    --ink-3:       #5d7498;   /* captions and table heads — 4.8:1 on paper */
+    --ink-4:       #8d9fba;   /* placeholders, and the quietest table cell */
+    --muted:       #5d7498;
+
+    --line:        #e2e9f4;
+    --line-2:      #eff3fa;
+    --line-strong: #d4deed;   /* the rule above a total */
+    --row-line:    #f3f7fc;   /* between rows of a list or table */
+    --field-line:  #d8e2f0;
+
+    --track:       #e7edf7;   /* the empty part of a bar */
+    --track-2:     #cfdcee;   /* and the leftover slice of a stacked one */
+
+    /* --------------------------------------------------------------------
+       The brand blue, and the one it hands off to.
+
+       One hue, three jobs, because contrast decides which blue can do what.
+
+       `--azure-vivid` (#287dfa) is the brand blue — the cornflower everyone
+       recognises. Against white it is 3.9:1, which is fine for a *shape* and
+       not fine for a *word*, so it is spent only where nothing has to be
+       read on top of it: progress fills, the focus ring, a chart bar.
+
+       `--azure` is that blue two steps down, and it is the one that fills a
+       control carrying white words — the live tab, the primary button, the
+       chosen segment. 4.7:1, so a 13.5px label survives it.
+
+       `--azure-ink` is blue as a word on a pale ground. 6.6:1.
+
+       Shapes use --azure-vivid, fills-with-words use --azure, words use
+       --azure-ink. The dark theme changes the values and nothing else.
+       -------------------------------------------------------------------- */
+    --azure-vivid: #287dfa;   /* the brand blue. Graphics only — see below. */
+    --azure:       #1d70e6;   /* fills that carry white words — 4.7:1 */
+    --azure-2:     #1560cf;   /* the hover of a filled control */
+    --azure-soft:  #e8f1ff;
+    --azure-line:  #bcd8ff;
+    --azure-ink:   #1657c4;   /* azure as a word, not as a fill — 6.6:1 */
+    --on-azure:    #ffffff;
+    --azure-glow:  rgba(29, 112, 230, .28);
+    --azure-ring:  rgba(29, 112, 230, .2);    /* the focus halo on a field */
+
+    --lagoon:      #00a3e0;   /* highlight only — rules, charts, the live day */
+    --lagoon-soft: #e0f4fd;
+
+    --node:        #ff6f2c;   /* the trip in progress. Rationed on purpose. */
+    --node-soft:   #fff0e6;
+
+    /* Trip categories. A category has exactly one colour and keeps it
+       everywhere it appears — the legend dot, the row icon, the budget bar
+       and the table tag are all the same fact drawn four ways. Travel sits
+       deliberately off the brand blue: a category that matched the primary
+       would read as "the selected one" on every screen it turned up on. */
+    --sky:         #0d8ab5;   /* travel — flights, trains, transfers */
+    --sky-soft:    #dff2f9;
+    --violet:      #6c46bd;   /* stays */
+    --violet-soft: #efe9fb;
+    --amber:       #a97612;   /* food */
+    --amber-soft:  #fbf1da;
+    --teal:        #0f7d78;   /* activities */
+    --teal-soft:   #dff0ef;
+    --rose:        #b93a6c;   /* shopping */
+    --rose-soft:   #fbe9f0;
+    --slate:       #55697c;   /* everything else */
+    --slate-soft:  #eceff2;
+
+    --green:       #14795c;   /* booked, packed, paid */
+    --green-soft:  #dff0ea;
+    --red:         #c4362f;
+    --red-soft:    #fdecea;
+    --red-line:    #f3ccc8;
+    --red-ink:     #8a231e;
+    --red-2:       #ad2f29;   /* the hover of a destructive button */
+    --on-red:      #ffffff;
+
+    --topbar:        rgba(255, 255, 255, .86);
+    --backdrop:      rgba(15, 41, 77, .48);
+    --scroll-shadow: rgba(15, 41, 77, .12);
+
+    /* The band carries five pieces of small white text, so its lightest
+       stop is chosen by what white can survive rather than by how bright the
+       blue can get: at #2060c2, pure white is 6.0:1 and the 82%-opacity
+       labels below clear 4.5:1. A stop any brighter and the captions on it
+       become decoration. */
+    --hero-a:   #2060c2;      /* the three stops of the hero band */
+    --hero-mid: #1a52a8;
+    --hero-b:   #123d80;
+
+    --radius:      20px;
+    --radius-sm:   12px;
+    --shadow:      0 1px 2px rgba(15, 41, 77, .05), 0 10px 28px rgba(15, 41, 77, .07);
+    --shadow-hero: 0 2px 6px rgba(22, 80, 184, .22), 0 18px 40px rgba(22, 80, 184, .24);
+}
+
+/* --------------------------------------------------------------------------
+   Dark theme.
+
+   Only the tokens move — every rule below this block is written against them.
+   The ground is a blue-grey evening rather than neutral grey, so azure still
+   looks like it belongs to the same app and the hero band still reads as
+   water rather than as a coloured rectangle.
+
+   Azure, lagoon and the category colours are all lifted: the daylight values
+   were chosen to carry weight against white, and against a dark ground they
+   read as mud. The meanings do not move.
+
+   PlanSphere is a light app — `data-theme="light"` is written on <html> in
+   index.html, so this block is off unless somebody asks for it. It is kept
+   complete and in step because switching that one attribute to "dark" is the
+   whole of turning it on; there is no toggle to build and nothing to resolve
+   before the first paint. There is no `prefers-color-scheme` query either:
+   the theme is a decision the app has made, not one it inherits.
+   -------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    /* A blue-grey evening, not a black one. The first pass sat at #071522,
+       a near-black, and every card on it looked like it was floating in a
+       hole. This ground is light enough to read as a surface, with the cards
+       resting on it rather than punched out of it. */
+    --canvas:      #131f33;
+    --paper:       #1b2b45;
+    --paper-2:     #223351;
+
+    --ink:         #eaf1fb;
+    --ink-2:       #b3c5de;
+    --ink-3:       #8598b5;
+    --ink-4:       #6a7d99;
+    --muted:       #8598b5;
+
+    --line:        #2b3f5e;
+    --line-2:      #243550;
+    --line-strong: #3a5175;
+    --row-line:    #22334e;
+    --field-line:  #3a5175;
+
+    --track:       #263854;
+    --track-2:     #375072;
+
+    --azure-vivid: #63a4ff;
+    --azure:       #4f96ff;
+    --azure-2:     #6aa8ff;
+    --azure-soft:  #1c3560;
+    --azure-line:  #2f4f80;
+    --azure-ink:   #9ec8ff;
+
+    /* The fill is lighter than the page here, so what sits on it is ink,
+       not white. Same rule as daylight, read the other way up. */
+    --on-azure:    #0b1c33;
+    --azure-glow:  rgba(79, 150, 255, .34);
+    --azure-ring:  rgba(79, 150, 255, .26);
+
+    --lagoon:      #3fc4ec;
+    --lagoon-soft: #10394d;
+
+    --node:        #ff8a47;
+    --node-soft:   #3d2417;
+
+    --sky:         #3fb3d8;
+    --sky-soft:    #12384a;
+    --violet:      #a08bf2;
+    --violet-soft: #2a2450;
+    --amber:       #dda93a;
+    --amber-soft:  #3a2d14;
+    --teal:        #35bcb2;
+    --teal-soft:   #103a37;
+    --rose:        #e77ea6;
+    --rose-soft:   #40202f;
+    --slate:       #93a8bd;
+    --slate-soft:  #22334b;
+
+    --green:       #3cc094;
+    --green-soft:  #113a2f;
+    --red:         #ef7069;
+    --red-soft:    #3f2321;
+    --red-line:    #66302c;
+    --red-ink:     #f7ada8;
+    --red-2:       #f78d87;
+
+    --topbar:        rgba(27, 43, 69, .86);
+    --backdrop:      rgba(8, 16, 28, .6);
+    --scroll-shadow: rgba(0, 0, 0, .42);
+
+    --hero-a:   #2a5fa8;
+    --hero-mid: #235088;
+    --hero-b:   #1a3d68;
+
+    --shadow:      0 1px 2px rgba(0, 0, 0, .26), 0 10px 28px rgba(0, 0, 0, .3);
+    --shadow-hero: 0 2px 6px rgba(0, 0, 0, .34), 0 18px 40px rgba(0, 0, 0, .4);
+}
+
+/* ==========================================================================
+   Page
+   ========================================================================== */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: "Spline Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .brand-name, .hero-value {
+    font-family: Archivo, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.app { display: flex; align-items: flex-start; min-height: 100vh; }
+.shell { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+:focus-visible { outline: 2px solid var(--lagoon); outline-offset: 2px; border-radius: 6px; }
+
+/* ==========================================================================
+   Sidebar — the brand, and the way between modules
+   ========================================================================== */
+.sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    z-index: 12;
+    flex: 0 0 236px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 100vh;
+    padding: 22px 16px;
+    background: var(--paper);
+    border-right: 1px solid var(--line);
+}
+
+/* --------------------------------------------------------------------------
+   The brand is a mark plus live text, not one flat image.
+
+   MoneyFlow ships its wordmark as an <img>, which is fine for a wordmark set
+   in a face the file can embed. PlanSphere's is set in Archivo, and an SVG
+   loaded through <img> cannot reach the page's webfonts — the name would
+   silently fall back to Arial in the one place it matters most. So the mark
+   stays an image and the name is text, which also means it themes itself and
+   stays sharp at any zoom.
+   -------------------------------------------------------------------------- */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    padding: 0 8px;
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.brand img { display: block; width: 34px; height: 34px; flex: 0 0 auto; }
+
+.brand-name {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -.035em;
+    white-space: nowrap;
+}
+
+.brand-name .thin { font-weight: 500; }
+
+/* The whole slogan, not a piece of it.
+
+   It was cut to "Plan infinity" to keep the sidebar to one line, which is
+   the wrong trade: the line is the product's promise, and half a promise
+   reads as a category label. It gets two lines instead, broken by hand at
+   the clause so the break is a pause rather than an accident, and set in
+   the same tracked caps as the stacked lockup so the app and the identity
+   say it the same way. */
+.tagline {
+    margin: 10px 0 0;
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.8;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+/* The gap above the first module belongs to the nav, which is always there,
+   not to the tagline, which comes and goes with the width. */
+.tabs { display: flex; flex-direction: column; gap: 3px; margin-top: 22px; }
+
+/* Full-width rows, so the target is the column rather than the word — and so
+   a long module name costs nothing that a short one does not. */
+.tabs button {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .16s ease;
+}
+
+.tabs button i { font-size: 15px; opacity: .7; }
+.tabs button:hover { background: var(--paper-2); color: var(--ink); }
+
+/* Filled, not a tint — the live module should be the loudest thing here. */
+.tabs button.is-on {
+    background: var(--azure);
+    color: var(--on-azure);
+    box-shadow: 0 2px 10px var(--azure-glow);
+}
+
+.tabs button.is-on i { opacity: 1; }
+
+/* A count riding on a nav row: how many stops, how many still to pack. It is
+   the only number in the column, so it never needs a label. */
+.tabs .count {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 7px;
+    background: var(--canvas);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.tabs button.is-on .count { background: rgba(255, 255, 255, .26); color: var(--on-azure); }
+
+/* --------------------------------------------------------------------------
+   Collapsed to a rail
+   --------------------------------------------------------------------------
+   Icons only, and the wordmark becomes the mark. The labels are clipped out
+   of the layout rather than removed from the page: `display: none` would take
+   the only name each button has away from a screen reader as well, leaving
+   six buttons that announce nothing.
+   -------------------------------------------------------------------------- */
+.app.is-rail .sidebar { flex-basis: 76px; padding-left: 12px; padding-right: 12px; }
+.app.is-rail .tagline { display: none; }
+.app.is-rail .brand { justify-content: center; padding: 0; }
+.app.is-rail .brand-name { display: none; }
+.app.is-rail .tabs button { justify-content: center; padding: 12px 0; }
+.app.is-rail .tabs button i { font-size: 17px; }
+.app.is-rail .tabs .count { display: none; }
+
+.app.is-rail .tabs button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   The one control that folds the sidebar away
+
+   What it does depends on how much room there is: a drawer on a phone, a rail
+   on a desktop — and the two jobs want two different shapes, so it is styled
+   twice. On a phone it is a button in the top bar, because the sidebar it
+   opens is not on the page to hang anything off.
+   ========================================================================== */
+.nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-right: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.nav-toggle:hover { border-color: var(--azure); background: var(--azure-soft); color: var(--azure-ink); }
+.nav-toggle i { font-size: 15px; }
+
+/* --------------------------------------------------------------------------
+   The desktop shape: a handle on the sidebar's own edge, where the movement
+   happens. `fixed` rather than in-flow — the button straddles the border and
+   no sensible place in either column can sit on top of it. Its offsets read
+   against the top bar, whose `backdrop-filter` makes it the containing block
+   for anything fixed inside it, and the top bar begins exactly where the
+   sidebar ends. So `left: -13px` is the edge in both states, with no width
+   to keep in step.
+   -------------------------------------------------------------------------- */
+@media (min-width: 1001px) {
+    .nav-toggle {
+        position: fixed;
+        top: 30px;
+        left: -13px;               /* half the button, past the column's edge */
+        width: 26px;
+        height: 26px;
+        margin: 0;
+        padding: 0;
+        border-radius: 50%;
+        background: var(--paper);
+        color: var(--muted);
+        box-shadow: 0 1px 5px rgba(0, 0, 0, .2);
+    }
+
+    .nav-toggle i { font-size: 11px; }
+
+    /* Clipped, not removed: the icon has no text of its own. */
+    .nav-toggle span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+.scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: var(--backdrop);
+    backdrop-filter: blur(2px);
+}
+
+/* ==========================================================================
+   Top bar — what is left of it: the trip switch and the file controls
+   ========================================================================== */
+.topbar {
+    position: sticky;
+    top: 0;
+    /* Above the sidebar's 12: the collapse handle is a child of this bar and
+       has to paint over the column edge it straddles. */
+    z-index: 14;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 12px 32px;
+    background: var(--topbar);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+}
+
+/* The trip everything on the page is about. It sits in the top bar rather
+   than in each module because every module answers to it, and a control that
+   six screens obey should not live inside one of them. */
+.trip-switch { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+
+.trip-switch label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.trip-switch select {
+    width: auto;
+    min-width: 190px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    font-weight: 650;
+}
+
+.tools { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.tools-sep { width: 1px; height: 20px; background: var(--line); }
+
+.stamp {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Main column
+
+   1340px is wide enough to stand two cards side by side and still narrow
+   enough that a full-width table does not run away from its own row heads.
+   ========================================================================== */
+.main {
+    flex: 1;
+    width: 100%;
+    max-width: 1340px;
+    margin: 0 auto;
+    padding: 26px 32px 64px;
+}
+
+.stack { display: flex; flex-direction: column; gap: 18px; }
+
+/* --------------------------------------------------------------------------
+   Two panes. A stack is right for cards that each need the whole width, and
+   wrong for the four or five that do not — those turn the page into a column
+   you scroll past rather than a page you read.
+   -------------------------------------------------------------------------- */
+.deck {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.deck > .card.is-wide { grid-column: 1 / -1; }
+
+/* Grid rows stretch their cards to the tallest in the row, so the two columns
+   always end level. The slack goes inside the shorter card, where it reads as
+   its own padding, and `flex` hands it to whatever part can usefully grow. */
+.deck > .card { display: flex; flex-direction: column; min-width: 0; }
+
+/* A flex item's `min-width` defaults to its content, which means a card that
+   became a flex container stops letting its wide table scroll inside its own
+   wrapper and pushes the page sideways instead. */
+.deck > .card > * { min-width: 0; }
+
+.deck .is-empty { display: flex; flex: 1 1 auto; }
+.deck .is-empty > .empty-state { flex: 1 1 auto; }
+.deck > .card > p.hint { margin-top: auto; }
+
+/* ==========================================================================
+   Hero band — the one thing the screen exists to answer, plus the two
+   figures that explain it.
+   ========================================================================== */
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 30px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 30px 34px;
+    border-radius: 24px;
+    background: linear-gradient(128deg, var(--hero-a) 0%, var(--hero-mid) 48%, var(--hero-b) 100%);
+    box-shadow: var(--shadow-hero);
+    color: #fff;
+}
+
+.hero-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+/* The dates the whole screen is scoped to, above the headline the way a
+   dateline sits above a story. */
+.hero-period {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 650;
+    color: rgba(255, 255, 255, .92);
+}
+
+.hero-period em {
+    font-style: normal;
+    font-weight: 500;
+    color: rgba(255, 255, 255, .82);
+    font-variant-numeric: tabular-nums;
+}
+
+.hero-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .84);
+}
+
+.hero-value {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -.035em;
+    font-variant-numeric: tabular-nums;
+}
+
+.hero-foot { font-size: 13px; color: rgba(255, 255, 255, .9); font-variant-numeric: tabular-nums; }
+
+.hero-stats { display: flex; gap: 12px; }
+
+.hero-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 168px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .14);
+}
+
+.hero-stat-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .84);
+}
+
+.hero-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.hero-stat-foot { font-size: 11.5px; line-height: 1.35; color: rgba(255, 255, 255, .84); }
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+.card {
+    padding: 24px 26px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+/* The rule under every heading gives the stack its rhythm. */
+.card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--line-2);
+}
+
+.card-head h2 { margin: 0; font-size: 16.5px; font-weight: 600; letter-spacing: -.02em; }
+.card-actions { display: flex; align-items: center; gap: 14px; }
+.card-note { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+.card-note b { font-weight: 700; color: var(--ink-2); }
+
+/* A filter, not a card: one control and its label, without the rule and the
+   40px of air that would make it look like a section of its own. */
+.card.is-bar { padding: 14px 18px; }
+.bar-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.bar-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .16s ease;
+}
+
+.ghost-btn:hover { border-color: var(--azure); background: var(--azure-soft); color: var(--azure-ink); }
+.ghost-btn.is-danger:hover { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+
+.primary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--azure);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--on-azure);
+    cursor: pointer;
+    box-shadow: 0 2px 8px var(--azure-glow);
+    transition: background .16s ease, box-shadow .16s ease, transform .1s ease;
+}
+
+.primary-btn:hover { background: var(--azure-2); box-shadow: 0 4px 14px var(--azure-glow); }
+.primary-btn:active { transform: translateY(1px); }
+
+/* Nothing to save is not a failure, so the button goes quiet rather than
+   vanishing — the note beside it already says why. */
+.primary-btn:disabled,
+.primary-btn:disabled:hover {
+    background: var(--track-2);
+    color: var(--ink-4);
+    box-shadow: none;
+    cursor: default;
+    transform: none;
+}
+
+.primary-btn i { font-size: 12px; }
+
+/* The small round destructive control that ends a row. */
+.row-x {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 11px;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background .16s ease, color .16s ease;
+}
+
+.row-x:hover { background: var(--red-soft); color: var(--red); }
+.row-x.is-edit:hover { background: var(--azure-soft); color: var(--azure-ink); }
+
+/* ==========================================================================
+   Fields — laid out across the card, not stacked down a narrow panel.
+   ========================================================================== */
+.field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(226px, 1fr));
+    gap: 18px;
+}
+
+.field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.field.is-wide { grid-column: 1 / -1; }
+
+.field label {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink);
+}
+
+.field .per { font-weight: 500; font-size: 11.5px; color: var(--ink-3); }
+
+.hint { margin: -1px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); }
+.hint i { margin-right: 3px; }
+
+/* Every input type the app uses is listed here on purpose. A type left out of
+   this rule does not inherit anything — it falls back to raw browser chrome
+   and looks broken beside the others. Add new types here first. */
+input[type="text"], input[type="number"], input[type="date"], input[type="time"],
+input[type="search"], input[type="url"], select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--field-line);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    font: inherit;
+    font-size: 14.5px;
+    color: var(--ink);
+    transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+input::placeholder, textarea::placeholder { color: var(--ink-4); }
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--azure-vivid);
+    box-shadow: 0 0 0 3px var(--azure-ring);
+}
+
+/* strip the spinner so the field reads as a figure, not a stepper */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* the native date and time fields ship their own chrome — flatten them so
+   they sit with the rest */
+input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; }
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: .5;
+    filter: grayscale(1) invert(var(--pick-invert, 0));
+    transition: opacity .16s ease;
+}
+
+input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
+:root[data-theme="dark"] { --pick-invert: 1; }
+
+.money-input { position: relative; display: flex; align-items: center; }
+
+.money-input .affix {
+    position: absolute;
+    left: 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-3);
+    pointer-events: none;
+}
+
+.money-input input {
+    padding-left: 42px;
+    font-size: 15.5px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+.money-input-sm input { padding: 9px 11px 9px 36px; font-size: 14px; }
+.money-input-sm .affix { left: 11px; font-size: 11.5px; }
+
+/* The footer of a form: the action, and the line that says what it will do. */
+.form-foot {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-2);
+}
+
+.form-foot .hint { margin: 0; }
+
+/* Segmented control — the live option is filled, not a white chip. */
+.seg {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+}
+
+.seg.is-wrap { flex-wrap: wrap; }
+
+.seg + .hint,
+.seg + .field-grid { margin-top: 12px; }
+
+.seg button {
+    flex: 1;
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .16s ease;
+}
+
+.seg button:hover { color: var(--ink); }
+.seg button.is-on { background: var(--azure); color: var(--on-azure); box-shadow: 0 2px 6px var(--azure-glow); }
+
+/* A view switch living in a card head, beside the note — not a form field. */
+.seg.is-compact { flex: 0 0 auto; padding: 3px; }
+.seg.is-compact button { flex: 0 0 auto; padding: 6px 12px; font-size: 12px; }
+
+/* ==========================================================================
+   Tally — a row of figures across the card, not a column of ledger lines.
+   ========================================================================== */
+.tally {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 0;
+    margin-top: 20px;
+    padding: 16px 4px;
+    border-top: 1px solid var(--line-2);
+    border-bottom: 1px solid var(--line-2);
+}
+
+.tally-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1 1 130px;
+    padding: 0 16px;
+    border-left: 1px solid var(--line-2);
+}
+
+.tally-cell:first-child { border-left: 0; }
+.tally-cell span { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.tally-cell b { font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tally-cell .is-minus { color: var(--red); }
+.tally-cell.is-total span { color: var(--azure-ink); }
+.tally-cell.is-total b { font-size: 19px; color: var(--azure-ink); }
+
+/* ==========================================================================
+   Tables
+   Horizontal scroll for narrow screens. The paired local/scroll gradients are
+   the classic pure-CSS scroll shadow: the edge shadow only shows while there
+   is more table to scroll to on that side.
+   ========================================================================== */
+.table-wrap {
+    overflow-x: auto;
+    margin: 0 -4px;
+    padding: 0 4px;
+    background:
+        linear-gradient(to right, var(--paper) 40%, transparent) left center / 28px 100% no-repeat local,
+        linear-gradient(to left,  var(--paper) 40%, transparent) right center / 28px 100% no-repeat local,
+        radial-gradient(farthest-side at 0 50%,    var(--scroll-shadow), transparent) left center / 11px 100% no-repeat scroll,
+        radial-gradient(farthest-side at 100% 50%, var(--scroll-shadow), transparent) right center / 11px 100% no-repeat scroll;
+}
+
+.data-table { width: 100%; border-collapse: collapse; min-width: 560px; }
+
+.data-table th {
+    padding: 0 14px 11px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: right;
+    border-bottom: 1px solid var(--line-2);
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 13px 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+    text-align: right;
+    border-bottom: 1px solid var(--row-line);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.data-table th:first-child,
+.data-table td:first-child { text-align: left; padding-left: 2px; white-space: normal; }
+
+.data-table td strong { display: block; font-size: 14px; font-weight: 650; color: var(--ink); }
+.data-table td small { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+
+.data-table .is-strong { font-weight: 700; color: var(--ink); }
+.data-table .is-minus  { color: var(--red); }
+.data-table .is-plus   { color: var(--green); }
+.data-table .is-muted  { color: var(--ink-4); }
+.data-table .dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
+
+/* The trip currently open in the top bar, so the switch and the list are
+   visibly the same thing rather than two lists that happen to agree. */
+.data-table tr.is-current td { background: var(--azure-soft); }
+.data-table tr.is-current td:first-child { padding-left: 12px; border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+.data-table tr.is-current td:last-child  { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+
+.data-table .row-actions { white-space: nowrap; text-align: right; }
+.data-table .row-actions .row-x { width: 28px; height: 28px; }
+
+.data-table .total-row td {
+    padding-top: 16px;
+    border-top: 1.5px solid var(--line-strong);
+    border-bottom: none;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+/* A status, in one alphabet across every table. */
+.tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 7px;
+    background: var(--slate-soft);
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+.tag.is-azure { background: var(--azure-soft); color: var(--azure-ink); }
+.tag.is-green { background: var(--green-soft); color: var(--green); }
+.tag.is-amber { background: var(--amber-soft); color: var(--amber); }
+.tag.is-red   { background: var(--red-soft);   color: var(--red); }
+.tag.is-node  { background: var(--node-soft);  color: var(--node); }
+.tag.is-solid { background: var(--azure); color: var(--on-azure); }
+
+/* ==========================================================================
+   Empty state
+
+   A heading, a rule, a table head with no rows under it, and a row that said
+   so again — four pieces of furniture for an empty room. One block replaces
+   all of it, and it has real height, so a card that is waiting still holds
+   its place in a column instead of collapsing and leaving a hole beside its
+   neighbour.
+   ========================================================================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 168px;
+    padding: 24px 20px;
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    text-align: center;
+}
+
+.empty-state i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    background: var(--canvas);
+    color: var(--ink-3);
+    font-size: 17px;
+}
+
+.empty-state p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); max-width: 34ch; }
+.empty-state b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+
+/* ==========================================================================
+   Bars — one shape, three jobs
+
+   A plain progress bar (packing, a day's spend against its share), a stacked
+   one (where the budget went), and the legend that names the slices. They
+   share a track so a card can put two of them side by side without the eye
+   having to re-learn the scale.
+   ========================================================================== */
+.prog {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--track);
+    overflow: hidden;
+}
+
+.prog > i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--azure-vivid);
+    transition: width .3s ease;
+}
+
+.prog.is-thin { height: 6px; }
+.prog > i.is-over  { background: var(--red); }
+.prog > i.is-done  { background: var(--green); }
+.prog > i.is-node  { background: var(--node); }
+
+.dist { display: flex; height: 18px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.dist > i { display: block; height: 100%; transition: width .3s ease; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 14px; }
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.legend-item b { font-weight: 700; color: var(--ink); }
+
+.dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--slate);
+    flex: 0 0 auto;
+}
+
+/* The one place a category colour is declared. Everything that needs to be
+   "the colour of stays" reaches for these rather than repeating a hex. */
+.c-travel  { background: var(--sky); }
+.c-stay    { background: var(--violet); }
+.c-food    { background: var(--amber); }
+.c-do      { background: var(--teal); }
+.c-shop    { background: var(--rose); }
+.c-other   { background: var(--slate); }
+
+/* ==========================================================================
+   The round icon that opens a row
+
+   An itinerary stop, a booking, a budget line and a dashboard entry are four
+   different rows carrying the same idea: a thing with a kind. One disc, one
+   size, tinted by the kind it belongs to.
+   ========================================================================== */
+.disc {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: var(--slate-soft);
+    color: var(--slate);
+    font-size: 15px;
+}
+
+.disc.k-travel { background: var(--sky-soft);    color: var(--sky); }
+.disc.k-stay   { background: var(--violet-soft); color: var(--violet); }
+.disc.k-food   { background: var(--amber-soft);  color: var(--amber); }
+.disc.k-do     { background: var(--teal-soft);   color: var(--teal); }
+.disc.k-shop   { background: var(--rose-soft);   color: var(--rose); }
+.disc.k-other  { background: var(--slate-soft);  color: var(--slate); }
+.disc.is-sm    { width: 30px; height: 30px; border-radius: 10px; font-size: 13px; }
+
+/* ==========================================================================
+   Itinerary — days down the page, stops inside them
+
+   The day is the unit people actually plan in, so it gets the heading and the
+   running cost. The rail down the left is what makes a list of stops read as
+   a sequence rather than as rows that happen to be sorted.
+   ========================================================================== */
+.day + .day { margin-top: 22px; }
+
+.day-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--line-2);
+}
+
+.day-n {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--azure-ink);
+}
+
+.day-date { font-size: 14.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.day-meta { margin-left: auto; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.day-meta b { font-weight: 700; color: var(--ink-2); }
+
+/* Today, while the trip is running. The only warm thing on the screen. */
+.day.is-now .day-n { color: var(--node); }
+.day.is-now .day-head { border-bottom-color: var(--node); }
+
+.stops { position: relative; padding-left: 18px; }
+
+/* The rail. It stops short at both ends so the sequence looks like it has a
+   first and a last stop rather than running off the card. */
+.stops::before {
+    content: "";
+    position: absolute;
+    top: 18px;
+    bottom: 18px;
+    left: 3px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--line);
+}
+
+.stop {
+    position: relative;
+    display: grid;
+    grid-template-columns: 58px 36px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+}
+
+.stop + .stop { border-top: 1px solid var(--row-line); }
+
+/* The node on the rail, level with the disc. */
+.stop::before {
+    content: "";
+    position: absolute;
+    left: -18px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: var(--track-2);
+    box-shadow: 0 0 0 3px var(--paper);
+}
+
+.stop.is-now::before { background: var(--node); }
+
+.stop-time {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stop-time.is-none { color: var(--ink-4); font-weight: 500; }
+
+.stop-body { min-width: 0; }
+.stop-title { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+
+.stop-where {
+    display: block;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 1px;
+    overflow-wrap: anywhere;
+}
+
+.stop-cost { font-size: 13.5px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stop-cost.is-free { color: var(--ink-4); font-weight: 500; }
+
+.stop-acts { display: inline-flex; gap: 2px; }
+
+/* ==========================================================================
+   Bookings and budget rows — a disc, a name, a figure and a bar
+
+   Same skeleton as an itinerary stop with the time taken out, so the two
+   screens feel like one app rather than two lists written a week apart.
+   ========================================================================== */
+.line-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 150px auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+}
+
+.line-row + .line-row { border-top: 1px solid var(--row-line); }
+.line-meta { min-width: 0; }
+.line-name { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.line-sub { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+
+.line-figures { display: flex; flex-direction: column; gap: 6px; }
+
+.line-figure {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.line-figure b { font-weight: 700; color: var(--ink); }
+.line-figure .is-over { color: var(--red); }
+
+/* ==========================================================================
+   Packing — a checklist that has to survive being long
+
+   Groups keep it scannable; the whole point is that a phone can show one
+   group at a time without the reader losing where they are.
+   ========================================================================== */
+.pack-group + .pack-group { margin-top: 20px; }
+
+.pack-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.pack-head h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.pack-head .prog { flex: 1 1 auto; max-width: 220px; }
+.pack-head .pack-count { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.pack-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 2px;
+}
+
+.pack-item + .pack-item { border-top: 1px solid var(--row-line); }
+
+.pack-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: var(--azure);
+    cursor: pointer;
+}
+
+.pack-item label { flex: 1 1 auto; font-size: 14px; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+.pack-item.is-done label { color: var(--ink-4); text-decoration: line-through; }
+.pack-item .qty { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Two controls sharing one field
+   ========================================================================== */
+.field-pair { display: flex; gap: 10px; }
+.field-pair > * { flex: 1 1 0; min-width: 0; }
+.field-pair > .is-narrow { flex: 0 0 118px; }
+
+/* ==========================================================================
+   Dialog — one thing to read, and two ways out of it
+
+   Import throws away what is here, and so does clearing a trip. Both are
+   worth a sentence and a deliberate second click.
+   ========================================================================== */
+.dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: var(--backdrop);
+    backdrop-filter: blur(3px);
+}
+
+.dialog-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 26px 28px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+}
+
+.dialog-card h2 { margin: 0 0 10px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.dialog-card p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+.dialog-actions button {
+    padding: 10px 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.dialog-actions button:hover { border-color: var(--ink-3); color: var(--ink); }
+
+.dialog-actions .is-go {
+    border-color: var(--red);
+    background: var(--red);
+    color: var(--on-red);
+}
+
+.dialog-actions .is-go:hover { background: var(--red-2); border-color: var(--red-2); color: var(--on-red); }
+
+/* A line that confirms something happened, under the control that did it. */
+.notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 11px;
+    background: var(--green-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--green);
+}
+
+.notice.is-bad { background: var(--red-soft); color: var(--red); }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+/* Two panes stop paying for themselves once each column is under about
+   600px — that is where a five-column table starts scrolling sideways inside
+   a card with room to spare below it. */
+@media (max-width: 1320px) {
+    .deck { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .topbar { gap: 12px; padding: 12px 18px; flex-wrap: wrap; }
+    .trip-switch { order: 3; width: 100%; margin-right: 0; }
+    .trip-switch select { flex: 1 1 auto; min-width: 0; }
+    .sidebar { padding: 10px 16px; }
+
+    .main { padding: 18px 16px 48px; }
+
+    /* The hero turns into a headline with two figures underneath it. */
+    .hero { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 24px 22px; border-radius: 20px; }
+    .hero-value { font-size: 36px; }
+    .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hero-stat { min-width: 0; }
+
+    .card { padding: 20px 18px; }
+
+    /* Title, running note and the action button need their own lines here. */
+    .card-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .card-note { text-align: left; }
+    .card-actions { width: 100%; flex-wrap: wrap; gap: 10px 12px; justify-content: space-between; }
+    .card-actions .seg.is-compact { flex: 1 1 100%; }
+    .card-actions .seg.is-compact button { flex: 1 1 auto; }
+
+    .tally { gap: 14px 0; }
+    .tally-cell { flex: 1 1 44%; padding: 0 14px; }
+    .tally-cell:nth-child(odd) { border-left: 0; }
+
+    /* A stop gives up its columns before it gives up its note: the time, the
+       disc and the title keep the first line, and the cost drops underneath
+       where there is room for it.
+
+       Explicit column and row numbers rather than named areas — a row can
+       carry a fourth child (the actions) or not, and a template that names
+       every slot has to be told what to do with the one that is missing. */
+    .stop {
+        grid-template-columns: 52px 30px minmax(0, 1fr) auto;
+        gap: 8px 10px;
+    }
+
+    .stop .disc { width: 30px; height: 30px; border-radius: 10px; font-size: 13px; }
+    .stop-cost { grid-column: 3; grid-row: 2; text-align: left; }
+    .stop-acts { grid-column: 4; grid-row: 1; }
+
+    .line-row { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px 12px; }
+    .line-figures { grid-column: 2 / -1; grid-row: 2; }
+
+    .pack-head { flex-wrap: wrap; }
+    .pack-head .prog { max-width: none; flex: 1 1 100%; order: 3; }
+
+    .field-pair { flex-wrap: wrap; }
+    .field-pair > .is-narrow { flex: 1 1 auto; }
+
+    .form-foot { gap: 12px; }
+    .primary-btn { width: 100%; justify-content: center; }
+}
+
+/* A 236px column is a quarter of a 1000px window, and on a phone it is most
+   of the screen. Below this the sidebar stops being a column at all and
+   becomes a drawer: off the page until it is asked for, full width for its
+   labels when it is, and gone again the moment a module is chosen. */
+@media (max-width: 1000px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 40;
+        width: 264px;
+        max-width: 82vw;
+        height: 100vh;
+        padding: 22px 16px;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        box-shadow: 0 0 44px rgba(0, 0, 0, .4);
+    }
+
+    .app.is-open .sidebar { transform: none; }
+
+    /* The rail is a desktop idea; in a drawer there is room for the words. */
+    .app.is-rail .sidebar { flex-basis: auto; width: 264px; padding: 22px 16px; }
+    .app.is-rail .tagline { display: block; }
+    .app.is-rail .brand { justify-content: flex-start; padding: 0 8px; }
+    .app.is-rail .brand-name { display: block; }
+    .app.is-rail .tabs button { justify-content: flex-start; padding: 11px 12px; }
+    .app.is-rail .tabs .count { display: inline-block; }
+
+    .app.is-rail .tabs button span {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+        clip-path: none;
+    }
+}
+
+@media (max-width: 700px) {
+    .topbar { padding: 10px 14px; }
+    .nav-toggle { padding: 8px 10px; }
+    .tools .stamp { display: none; }
+
+    .nav-toggle span,
+    .tools button span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 460px) {
+    .hero-stats { grid-template-columns: 1fr; }
+    .day-head { flex-wrap: wrap; gap: 6px 12px; }
+    .day-meta { margin-left: 0; flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

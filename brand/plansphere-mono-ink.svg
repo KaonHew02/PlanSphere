@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere">
+  <title>PlanSphere mark, single colour (ink)</title>
+  <defs>
+    <clipPath id="g"><circle cx="64" cy="64" r="30"/></clipPath>
+    <mask id="fh" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220"><rect x="64" y="-40" width="136" height="220" fill="#fff"/></mask>
+  </defs>
+  <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#0B2038" stroke-opacity="0.38" stroke-width="5.5" stroke-linecap="round"/></g>
+  <circle cx="64" cy="64" r="30" fill="#0B2038" fill-opacity="0.10"/>
+  <g clip-path="url(#g)" fill="none" stroke="#0B2038" stroke-opacity="0.32" stroke-width="1.1">
+    <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+    <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+  </g>
+  <circle cx="64" cy="64" r="30" fill="none" stroke="#0B2038" stroke-width="1.7"/>
+  <g clip-path="url(#g)"><g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#FFFFFF" stroke-width="11.5" stroke-linecap="round" mask="url(#fh)"/></g></g>
+  <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#0B2038" stroke-width="6.2" stroke-linecap="round" mask="url(#fh)"/></g>
+  <circle cx="64" cy="64" r="5.4" fill="#0B2038"/>
+</svg>

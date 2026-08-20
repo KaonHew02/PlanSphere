@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere concept: Route Arc">
+  <title>PlanSphere — Route Arc</title>
+  <defs><radialGradient id="gS" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#79b4ff"/><stop offset=".45" stop-color="#2b7bf0"/><stop offset="1" stop-color="#103a78"/></radialGradient><clipPath id="g"><circle cx="60" cy="78" r="32"/></clipPath></defs>
+ <g transform="translate(-6.4 -5.1)">
+  <circle cx="60" cy="78" r="32" fill="url(#gS)"/>
+  <g clip-path="url(#g)" fill="none" stroke="#dbeaff" stroke-opacity="0.34" stroke-width="1.2">
+    <ellipse cx="60" cy="78" rx="12" ry="32"/>
+    <path d="M28 68Q60 76 92 68"/><path d="M28 82Q60 90 92 82"/>
+  </g>
+  <path d="M26 88C34 26 92 14 108 44" fill="none" stroke="#287dfa" stroke-width="4.2" stroke-linecap="round" stroke-dasharray="0.1 9"/>
+  <circle cx="26" cy="88" r="5.6" fill="#ff6f2c"/>
+  <g transform="translate(108 44) rotate(58)"><path d="M0 -9L9 9L0 4L-9 9Z" fill="#1d70e6"/></g>
+ </g>
+</svg>

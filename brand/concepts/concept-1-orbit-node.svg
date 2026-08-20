@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere concept: Orbit Node">
+  <title>PlanSphere — Orbit Node</title>
+  <defs><radialGradient id="gS" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#79b4ff"/><stop offset=".45" stop-color="#2b7bf0"/><stop offset="1" stop-color="#103a78"/></radialGradient><linearGradient id="gB" x1="20" y1="14" x2="108" y2="114" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1550a8"/></linearGradient><clipPath id="g"><circle cx="64" cy="64" r="30"/></clipPath><mask id="fh" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220"><rect x="64" y="-40" width="136" height="220" fill="#fff"/></mask></defs>
+  <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#1550a8" stroke-width="5.5" stroke-linecap="round"/></g>
+  <circle cx="64" cy="64" r="30" fill="url(#gS)"/>
+  <g clip-path="url(#g)" fill="none" stroke="#dbeaff" stroke-opacity="0.32" stroke-width="1.1">
+    <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+    <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+  </g>
+  <g clip-path="url(#g)"><g transform="rotate(-16 64 64)">
+    <path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#0b2c58" stroke-opacity="0.5" stroke-width="11" stroke-linecap="round" mask="url(#fh)"/>
+  </g></g>
+  <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#6fc4ff" stroke-width="6.2" stroke-linecap="round" mask="url(#fh)"/></g>
+  <circle cx="64" cy="64" r="5.4" fill="#ff6f2c"/>
+</svg>

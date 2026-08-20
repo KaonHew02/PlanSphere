@@ -1,0 +1,416 @@
+<title>PlanSphere Logo Routes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Spline+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f1f5fb; --surface:#ffffff; --surface-2:#f7faff;
+  --ink:#0f294d; --ink-2:#46628a; --muted:#5d7498; --line:#e2e9f4; --line-2:#eff3fa;
+  --vivid:#287dfa; --blue:#1d70e6; --blue-ink:#1657c4; --deep:#123d80;
+  --node:#ff6f2c;
+  --band-a:#2060c2; --band-b:#123d80;
+  --good:#14795c; --warn:#a97612; --bad:#c4362f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131f33; --surface:#1b2b45; --surface-2:#223351;
+    --ink:#eaf1fb; --ink-2:#b3c5de; --muted:#8598b5; --line:#2b3f5e; --line-2:#243550;
+    --vivid:#4f96ff; --blue:#4f96ff; --blue-ink:#9ec8ff; --deep:#1a3d68;
+    --band-a:#2a5fa8; --band-b:#1a3d68;
+    --good:#3cc094; --warn:#dda93a; --bad:#ef7069;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131f33; --surface:#1b2b45; --surface-2:#223351;
+  --ink:#eaf1fb; --ink-2:#b3c5de; --muted:#8598b5; --line:#2b3f5e; --line-2:#243550;
+  --vivid:#4f96ff; --blue:#4f96ff; --blue-ink:#9ec8ff; --deep:#1a3d68;
+  --band-a:#2a5fa8; --band-b:#1a3d68;
+  --good:#3cc094; --warn:#dda93a; --bad:#ef7069;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Spline Sans",system-ui,sans-serif;font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Archivo,"Helvetica Neue",Arial,sans-serif;margin:0;text-wrap:balance;letter-spacing:-.025em}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+.wrap{max-width:1120px;margin:0 auto;padding:0 26px}
+:focus-visible{outline:2px solid var(--vivid);outline-offset:3px;border-radius:5px}
+
+.top{background:linear-gradient(132deg,var(--band-a),var(--band-b));color:#fff;padding:56px 0 52px}
+.eyebrow{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.84);font-weight:500;margin:0 0 14px}
+.top h1{font-size:clamp(1.9rem,4.6vw,2.9rem);font-weight:600;color:#fff}
+.top p{margin:14px 0 0;max-width:62ch;color:rgba(255,255,255,.92);font-size:1.02rem}
+
+.band{padding:56px 0;border-bottom:1px solid var(--line)}
+.band:last-of-type{border-bottom:0}
+.head{max-width:64ch;margin-bottom:30px}
+.kicker{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0 0 8px}
+.head h2{font-size:clamp(1.45rem,3vw,1.95rem);font-weight:600}
+.head p{margin:10px 0 0;color:var(--ink-2)}
+
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+
+.concept{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.concept.is-now{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--vivid) 16%,transparent)}
+.stage{display:flex;align-items:center;justify-content:center;padding:30px 20px 24px;background:var(--surface-2);border-bottom:1px solid var(--line-2)}
+.stage svg{width:118px;height:118px}
+.body{padding:20px 22px 22px;display:flex;flex-direction:column;gap:12px;flex:1}
+.name{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.name h3{font-size:1.06rem;font-weight:600}
+.name .no{font-size:10.5px;letter-spacing:.14em;color:var(--muted);font-weight:500}
+.why{margin:0;font-size:.93rem;color:var(--ink-2)}
+.for{margin:0;font-size:.85rem;color:var(--muted)}
+.for b{color:var(--ink-2);font-weight:650}
+
+/* the three proofs every mark has to pass */
+.proofs{display:flex;align-items:center;gap:16px;margin-top:auto;padding-top:16px;border-top:1px solid var(--line-2)}
+.proof{display:flex;flex-direction:column;align-items:center;gap:7px}
+.proof span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.proof svg{display:block}
+.p24 svg{width:24px;height:24px}
+.tile{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--band-a),var(--band-b));display:flex;align-items:center;justify-content:center}
+.tile svg{width:26px;height:26px;filter:brightness(0) invert(1)}
+.flat svg{width:26px;height:26px;filter:brightness(0)}
+:root[data-theme="dark"] .flat svg{filter:brightness(0) invert(1)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .flat svg{filter:brightness(0) invert(1)}}
+
+.verdict{margin-left:auto;text-align:right;font-size:.8rem;line-height:1.4}
+.verdict b{display:block;font-weight:700}
+.v-good b{color:var(--good)} .v-warn b{color:var(--warn)} .v-bad b{color:var(--bad)}
+
+table.cmp{width:100%;border-collapse:collapse;min-width:640px}
+.tablewrap{overflow-x:auto}
+table.cmp th{padding:0 12px 10px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;border-bottom:1px solid var(--line-2);white-space:nowrap}
+table.cmp th:first-child{text-align:left}
+table.cmp td{padding:12px;font-size:.88rem;text-align:center;border-bottom:1px solid var(--line-2);color:var(--ink-2)}
+table.cmp td:first-child{text-align:left;font-weight:650;color:var(--ink);white-space:nowrap}
+table.cmp .y{color:var(--good);font-weight:700}
+table.cmp .m{color:var(--warn);font-weight:700}
+table.cmp .n{color:var(--bad);font-weight:700}
+table.cmp tr.is-now td{background:color-mix(in srgb,var(--vivid) 8%,transparent)}
+
+.pick{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px 28px;display:grid;gap:22px;grid-template-columns:132px minmax(0,1fr);align-items:start}
+@media (max-width:620px){.pick{grid-template-columns:1fr}}
+.pick svg{width:132px;height:132px}
+.pick h3{font-size:1.15rem;font-weight:600;margin-bottom:8px}
+.pick p{margin:0 0 10px;color:var(--ink-2);font-size:.96rem}
+.pick p:last-child{margin-bottom:0}
+
+.files{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.files .row{display:flex;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line-2);align-items:baseline}
+.files .row:last-child{border-bottom:0}
+.files .fn{font-size:.83rem;flex:none;min-width:22ch;color:var(--ink)}
+.files .fd{font-size:.86rem;color:var(--muted)}
+@media (max-width:600px){.files .row{flex-direction:column;gap:3px}.files .fn{min-width:0}}
+.foot{padding:36px 0 54px;color:var(--muted);font-size:.82rem;letter-spacing:.06em}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="gB" x1="20" y1="14" x2="108" y2="114" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1550a8"/>
+  </linearGradient>
+  <linearGradient id="gB2" x1="14" y1="20" x2="114" y2="108" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#3f8dfb"/><stop offset="1" stop-color="#123d80"/>
+  </linearGradient>
+  <radialGradient id="gS" cx="34%" cy="28%" r="82%">
+    <stop offset="0" stop-color="#79b4ff"/><stop offset=".45" stop-color="#2b7bf0"/><stop offset="1" stop-color="#103a78"/>
+  </radialGradient>
+
+  <!-- 1 · Orbit Node (the incumbent) -->
+  <clipPath id="oGlobe"><circle cx="64" cy="64" r="30"/></clipPath>
+  <mask id="oFront" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220"><rect x="64" y="-40" width="136" height="220" fill="#fff"/></mask>
+  <path id="oPath" d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z"/>
+  <symbol id="c1" viewBox="0 0 128 128">
+    <g transform="rotate(-16 64 64)"><use href="#oPath" fill="none" stroke="#1550a8" stroke-width="5.5" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="30" fill="url(#gS)"/>
+    <g clip-path="url(#oGlobe)" fill="none" stroke="#dbeaff" stroke-opacity=".32" stroke-width="1.1">
+      <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+      <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+    </g>
+    <g clip-path="url(#oGlobe)"><g transform="rotate(-16 64 64)">
+      <use href="#oPath" fill="none" stroke="#0b2c58" stroke-opacity=".5" stroke-width="11" stroke-linecap="round" mask="url(#oFront)"/>
+    </g></g>
+    <g transform="rotate(-16 64 64)"><use href="#oPath" fill="none" stroke="#6fc4ff" stroke-width="6.2" stroke-linecap="round" mask="url(#oFront)"/></g>
+    <circle cx="64" cy="64" r="5.4" fill="#ff6f2c"/>
+  </symbol>
+
+  <!-- 2 · Pin Sphere -->
+  <clipPath id="pHead"><circle cx="64" cy="52" r="23"/></clipPath>
+  <symbol id="c2" viewBox="0 0 128 128">
+    <path d="M64 118C64 118 26 82 26 52A38 38 0 1 1 102 52C102 82 64 118 64 118Z" fill="url(#gB)"/>
+    <circle cx="64" cy="52" r="23" fill="#fff"/>
+    <g clip-path="url(#pHead)" fill="none" stroke="#1d70e6" stroke-width="2.1">
+      <ellipse cx="64" cy="52" rx="8.5" ry="23"/>
+      <path d="M39 45Q64 51 89 45"/><path d="M39 59Q64 65 89 59"/>
+    </g>
+    <circle cx="64" cy="52" r="23" fill="none" stroke="#1d70e6" stroke-opacity=".28" stroke-width="2"/>
+    <circle cx="64" cy="52" r="4.6" fill="#ff6f2c"/>
+  </symbol>
+
+  <!-- 3 · Latitude Stack -->
+  <symbol id="c3" viewBox="0 0 128 128">
+    <g fill="url(#gB2)">
+      <rect x="40.8" y="17.5" width="46.4" height="9" rx="4.5"/>
+      <rect x="25.0" y="31.5" width="78.0" height="9" rx="4.5"/>
+      <rect x="18.1" y="45.5" width="91.8" height="9" rx="4.5"/>
+      <rect x="16.0" y="59.5" width="96.0" height="9" rx="4.5"/>
+      <rect x="18.1" y="73.5" width="91.8" height="9" rx="4.5" fill="#ff6f2c"/>
+      <rect x="25.0" y="87.5" width="78.0" height="9" rx="4.5"/>
+      <rect x="40.8" y="101.5" width="46.4" height="9" rx="4.5"/>
+    </g>
+  </symbol>
+
+  <!-- 4 · Route Arc -->
+  <clipPath id="rGlobe"><circle cx="60" cy="78" r="32"/></clipPath>
+  <symbol id="c4" viewBox="0 0 128 128">
+   <g transform="translate(-6.4 -5.1)">
+    <circle cx="60" cy="78" r="32" fill="url(#gS)"/>
+    <g clip-path="url(#rGlobe)" fill="none" stroke="#dbeaff" stroke-opacity=".34" stroke-width="1.2">
+      <ellipse cx="60" cy="78" rx="12" ry="32"/>
+      <path d="M28 68Q60 76 92 68"/><path d="M28 82Q60 90 92 82"/>
+    </g>
+    <path d="M26 88C34 26 92 14 108 44" fill="none" stroke="#287dfa" stroke-width="4.2"
+          stroke-linecap="round" stroke-dasharray="0.1 9"/>
+    <circle cx="26" cy="88" r="5.6" fill="#ff6f2c"/>
+    <g transform="translate(108 44) rotate(58)">
+      <path d="M0 -9L9 9L0 4L-9 9Z" fill="#1d70e6"/>
+    </g>
+   </g>
+  </symbol>
+
+  <!-- 5 · Meridian P -->
+  <symbol id="c5" viewBox="0 0 128 128">
+    <rect x="24" y="18" width="13" height="92" rx="6.5" fill="#123d80"/>
+    <circle cx="70" cy="52" r="28" fill="none" stroke="url(#gB)" stroke-width="13"/>
+    <path d="M48 52Q70 62 92 52" fill="none" stroke="#123d80" stroke-opacity=".42" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="70" cy="52" r="6.2" fill="#ff6f2c"/>
+  </symbol>
+
+  <!-- 6 · Stub Sphere -->
+  <clipPath id="sGlobe"><circle cx="64" cy="64" r="42"/></clipPath>
+  <symbol id="c6" viewBox="0 0 128 128">
+    <circle cx="64" cy="64" r="42" fill="url(#gS)"/>
+    <g clip-path="url(#sGlobe)">
+      <g fill="none" stroke="#dbeaff" stroke-opacity=".34" stroke-width="1.4">
+        <ellipse cx="64" cy="64" rx="15" ry="42"/><ellipse cx="64" cy="64" rx="31" ry="42"/>
+        <path d="M22 50Q64 59 106 50"/><path d="M22 64Q64 73 106 64"/><path d="M22 78Q64 87 106 78"/>
+      </g>
+      <rect x="86" y="22" width="42" height="84" fill="#fff" fill-opacity=".16"/>
+      <line x1="86" y1="18" x2="86" y2="110" stroke="#f1f5fb" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="5 6"/>
+    </g>
+    <circle cx="100" cy="64" r="5" fill="#ff6f2c"/>
+  </symbol>
+
+  <!-- 7 · Compass Node -->
+  <symbol id="c7" viewBox="0 0 128 128">
+   <g transform="translate(64 64) scale(1.15) translate(-64 -64)">
+    <circle cx="64" cy="64" r="40" fill="none" stroke="url(#gB)" stroke-width="9"/>
+    <path d="M64 26L72.5 55.5L102 64L72.5 72.5L64 102L55.5 72.5L26 64L55.5 55.5Z" fill="#1550a8"/>
+    <circle cx="64" cy="64" r="6" fill="#ff6f2c"/>
+   </g>
+  </symbol>
+</defs></svg>
+
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow mono">PlanSphere · logo study · six alternatives</p>
+    <h1>Six other routes to the same mark</h1>
+    <p>Each of these is a different <em>idea</em>, not a restyling of the one you have. They are drawn in the app's new cornflower blue so you can judge them against the interface they will sit in, and every one is put through the same three tests underneath: does it survive 24 pixels, does it survive being flattened to one colour, and does it survive being reversed out of a blue tile.</p>
+  </div>
+</header>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="kicker mono">Where we are</p>
+      <h2>The incumbent</h2>
+      <p>Worth keeping on screen while you look at the rest — the question is not whether the alternatives are good, it is whether any of them is better than this.</p>
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(300px,460px)">
+      <article class="concept is-now">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Orbit Node"><use href="#c1" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">CURRENT</span><h3>Orbit Node</h3></div>
+          <p class="why">An infinity loop that is a real orbit: it passes behind the planet on the left and across its face on the right, so the figure-eight is a route rather than a symbol laid on top of a globe.</p>
+          <p class="for"><b>Strongest at:</b> saying the slogan without words. <b>Weakest at:</b> small sizes — the weave is the whole idea and it is the first thing to close up.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c1" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c1" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c1" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-warn"><b>Needs a mono cut</b>Already has one</div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="kicker mono">The alternatives</p>
+      <h2>Six directions</h2>
+      <p>Ordered roughly from the most literal to the most abstract. Read the <em>Flat</em> proof carefully: a mark that survives being crushed to a single colour needs no special version for stamps, embroidery or a one-ink invoice. A mark that collapses into a blob there needs a second drawing made by hand.</p>
+    </div>
+
+    <div class="grid">
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Pin Sphere"><use href="#c2" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">01</span><h3>Pin Sphere</h3></div>
+          <p class="why">The map pin everyone already reads as "a place", with a globe knocked out of its head instead of the usual dot. The most immediately legible thing on this page — nobody has to be told what it is.</p>
+          <p class="for"><b>Best for:</b> app stores and maps, where it competes with a hundred other icons. <b>Cost:</b> it is also the least distinctive — pins are the most crowded shape in travel.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c2" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c2" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c2" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-bad"><b>Collapses flat</b>Whole head fills in</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Latitude Stack"><use href="#c3" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">02</span><h3>Latitude Stack</h3></div>
+          <p class="why">Seven bars whose widths are the chords of a circle, so the silhouette is a sphere built entirely out of lines of latitude. It is also seven days with one of them lit — the globe and the itinerary are the same drawing.</p>
+          <p class="for"><b>Best for:</b> a product that is really a planner. Scales further down than anything else here. <b>Cost:</b> it needs a second of thought before the sphere appears.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c3" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c3" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c3" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-good"><b>Survives everything</b>No mono cut needed</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Route Arc"><use href="#c4" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">03</span><h3>Route Arc</h3></div>
+          <p class="why">A dotted flight path leaving a globe, with the departure marked in amber and the arrival as a wing. The most conventional idea on the page and the one whose meaning is nearest the surface.</p>
+          <p class="for"><b>Best for:</b> being understood in half a second by someone who has never seen it. <b>Cost:</b> it is the shape three of your competitors already use.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c4" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c4" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c4" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-warn"><b>Dashes close up</b>Thicken below 32px</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Meridian P"><use href="#c5" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">04</span><h3>Meridian P</h3></div>
+          <p class="why">A monogram that only works because of the name: the bowl of the P is already a circle, so it costs nothing to make it the planet. One latitude line and the node are the entire intervention.</p>
+          <p class="for"><b>Best for:</b> square crops, merchandise, a favicon that has to hold its own beside a wordmark. <b>Cost:</b> a monogram says the name, not the promise.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c5" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c5" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c5" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-good"><b>Survives everything</b>No mono cut needed</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Stub Sphere"><use href="#c6" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">05</span><h3>Stub Sphere</h3></div>
+          <p class="why">A planet with a boarding pass's perforation running down it. Two objects that have nothing to do with each other, sharing one outline — the globe is the ticket. The idea with the most personality here.</p>
+          <p class="for"><b>Best for:</b> a brand that wants to be remembered rather than understood. <b>Cost:</b> the perforation is fine detail, and fine detail is what dies first.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c6" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c6" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c6" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-bad"><b>Collapses flat</b>Becomes a plain disc</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="stage"><svg viewBox="0 0 128 128" role="img" aria-label="Compass Node"><use href="#c7" width="128" height="128"/></svg></div>
+        <div class="body">
+          <div class="name"><span class="no mono">06</span><h3>Compass Node</h3></div>
+          <p class="why">A four-point star inside a ring: the oldest travel symbol there is, drawn tight enough to read as a solid object rather than an illustration. The ring is the sphere, the star is the bearing.</p>
+          <p class="for"><b>Best for:</b> the widest range of sizes and surfaces of anything here. <b>Cost:</b> it is a compass. It says direction, not infinity, and not planning.</p>
+          <div class="proofs">
+            <div class="proof p24"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c7" width="128" height="128"/></svg><span>24px</span></div>
+            <div class="proof flat"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c7" width="128" height="128"/></svg><span>Flat</span></div>
+            <div class="proof"><div class="tile"><svg viewBox="0 0 128 128" aria-hidden="true"><use href="#c7" width="128" height="128"/></svg></div><span>Tile</span></div>
+            <div class="verdict v-good"><b>Survives everything</b>No mono cut needed</div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="kicker mono">Side by side</p>
+      <h2>What each one actually buys you</h2>
+      <p>The first two columns are mechanical and I have checked them on this page. The last three are judgement, and you should disagree with them where you do.</p>
+    </div>
+    <div class="tablewrap">
+      <table class="cmp">
+        <thead><tr>
+          <th>Mark</th><th>Reads at 24px</th><th>One colour</th><th>Says travel</th><th>Says the slogan</th><th>Unlike the field</th>
+        </tr></thead>
+        <tbody>
+          <tr class="is-now"><td>Orbit Node <span class="mono" style="color:var(--muted);font-size:.75rem">current</span></td><td class="m">Tight</td><td class="m">With a cut</td><td class="y">Yes</td><td class="y">Exactly</td><td class="y">Yes</td></tr>
+          <tr><td>Pin Sphere</td><td class="y">Yes</td><td class="n">No</td><td class="y">Instantly</td><td class="n">No</td><td class="n">No</td></tr>
+          <tr><td>Latitude Stack</td><td class="y">Best here</td><td class="y">Yes</td><td class="m">Eventually</td><td class="m">Partly</td><td class="y">Yes</td></tr>
+          <tr><td>Route Arc</td><td class="m">Tight</td><td class="m">With a cut</td><td class="y">Instantly</td><td class="m">Partly</td><td class="n">No</td></tr>
+          <tr><td>Meridian P</td><td class="y">Yes</td><td class="y">Yes</td><td class="m">Only with the name</td><td class="n">No</td><td class="m">Somewhat</td></tr>
+          <tr><td>Stub Sphere</td><td class="n">No</td><td class="n">No</td><td class="y">Yes</td><td class="m">Partly</td><td class="y">Very</td></tr>
+          <tr><td>Compass Node</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td><td class="n">No</td><td class="n">No</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="kicker mono">If you want my answer</p>
+      <h2>Keep the orbit, add the stack</h2>
+    </div>
+    <div class="pick">
+      <svg viewBox="0 0 128 128" role="img" aria-label="Latitude Stack"><use href="#c3" width="128" height="128"/></svg>
+      <div>
+        <h3>Latitude Stack, as the small-size half of a pair</h3>
+        <p>Nothing on this page beats Orbit Node at what the brand is actually about — it is the only mark that draws the slogan rather than illustrating the category. I would not replace it.</p>
+        <p>But its weakness is real and it is the weakness that costs you most: the weave is the idea, and the weave is the first thing to close at favicon size. <b>Latitude Stack solves exactly that</b> and nothing else. It survives 24px better than anything here, it needs no separate one-colour drawing, and it carries the same two facts — a sphere, and days you can plan — in a form that is all silhouette.</p>
+        <p>So: Orbit Node stays the mark. Latitude Stack becomes the icon it degrades into, the way a wordmark degrades into a monogram. One idea, two draw weights, and the favicon stops being an apology.</p>
+        <p class="for">If you would rather have one mark and no pair, take <b>Meridian P</b> — it is the only single mark here that passes every mechanical test without giving up the name.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <p class="kicker mono">Files</p>
+      <h2>All seven, as vectors</h2>
+      <p>Saved beside the identity sheet, in <span class="mono">brand/concepts/</span>. Each is a standalone SVG at 128 units with no external dependency.</p>
+    </div>
+    <div class="files">
+      <div class="row"><span class="fn mono">concept-1-orbit-node.svg</span><span class="fd">The incumbent, in the new blue.</span></div>
+      <div class="row"><span class="fn mono">concept-2-pin-sphere.svg</span><span class="fd">Map pin with the globe knocked out of the head.</span></div>
+      <div class="row"><span class="fn mono">concept-3-latitude-stack.svg</span><span class="fd">Seven latitude bars; one lit. The recommended icon.</span></div>
+      <div class="row"><span class="fn mono">concept-4-route-arc.svg</span><span class="fd">Dotted flight path leaving a globe.</span></div>
+      <div class="row"><span class="fn mono">concept-5-meridian-p.svg</span><span class="fd">Monogram — the P's bowl as the planet.</span></div>
+      <div class="row"><span class="fn mono">concept-6-stub-sphere.svg</span><span class="fd">Globe with a boarding-pass perforation.</span></div>
+      <div class="row"><span class="fn mono">concept-7-compass-node.svg</span><span class="fd">Four-point star in a ring.</span></div>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap foot mono">PLANSPHERE · LOGO STUDY · PLAN INFINITY AND TRAVEL BEYOND THE WORLD</footer>

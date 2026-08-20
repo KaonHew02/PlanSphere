@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere concept: Pin Sphere">
+  <title>PlanSphere — Pin Sphere</title>
+  <defs><linearGradient id="gB" x1="20" y1="14" x2="108" y2="114" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1550a8"/></linearGradient><clipPath id="h"><circle cx="64" cy="52" r="23"/></clipPath></defs>
+  <path d="M64 118C64 118 26 82 26 52A38 38 0 1 1 102 52C102 82 64 118 64 118Z" fill="url(#gB)"/>
+  <circle cx="64" cy="52" r="23" fill="#ffffff"/>
+  <g clip-path="url(#h)" fill="none" stroke="#1d70e6" stroke-width="2.1">
+    <ellipse cx="64" cy="52" rx="8.5" ry="23"/>
+    <path d="M39 45Q64 51 89 45"/><path d="M39 59Q64 65 89 59"/>
+  </g>
+  <circle cx="64" cy="52" r="23" fill="none" stroke="#1d70e6" stroke-opacity="0.28" stroke-width="2"/>
+  <circle cx="64" cy="52" r="4.6" fill="#ff6f2c"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere concept: Compass Node">
+  <title>PlanSphere — Compass Node</title>
+  <defs><linearGradient id="gB" x1="20" y1="14" x2="108" y2="114" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4f9bff"/><stop offset="1" stop-color="#1550a8"/></linearGradient></defs>
+ <g transform="translate(64 64) scale(1.15) translate(-64 -64)">
+  <circle cx="64" cy="64" r="40" fill="none" stroke="url(#gB)" stroke-width="9"/>
+  <path d="M64 26L72.5 55.5L102 64L72.5 72.5L64 102L55.5 72.5L26 64L55.5 55.5Z" fill="#1550a8"/>
+  <circle cx="64" cy="64" r="6" fill="#ff6f2c"/>
+ </g>
+</svg>

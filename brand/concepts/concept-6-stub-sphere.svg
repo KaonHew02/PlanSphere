@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="256" height="256" role="img" aria-label="PlanSphere concept: Stub Sphere">
+  <title>PlanSphere — Stub Sphere</title>
+  <defs><radialGradient id="gS" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#79b4ff"/><stop offset=".45" stop-color="#2b7bf0"/><stop offset="1" stop-color="#103a78"/></radialGradient><clipPath id="g"><circle cx="64" cy="64" r="42"/></clipPath></defs>
+  <circle cx="64" cy="64" r="42" fill="url(#gS)"/>
+  <g clip-path="url(#g)">
+    <g fill="none" stroke="#dbeaff" stroke-opacity="0.34" stroke-width="1.4">
+      <ellipse cx="64" cy="64" rx="15" ry="42"/><ellipse cx="64" cy="64" rx="31" ry="42"/>
+      <path d="M22 50Q64 59 106 50"/><path d="M22 64Q64 73 106 64"/><path d="M22 78Q64 87 106 78"/>
+    </g>
+    <rect x="86" y="22" width="42" height="84" fill="#ffffff" fill-opacity="0.16"/>
+    <line x1="86" y1="18" x2="86" y2="110" stroke="#f1f5fb" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="5 6"/>
+  </g>
+  <circle cx="100" cy="64" r="5" fill="#ff6f2c"/>
+</svg>

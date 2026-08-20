@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 306" width="880" height="612" role="img" aria-label="PlanSphere - Plan Infinity and Travel Beyond the World.">
+  <title>PlanSphere stacked lockup</title>
+  <defs>
+    <radialGradient id="sphere" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#5FE0EC"/><stop offset="0.38" stop-color="#1594B6"/><stop offset="1" stop-color="#08294A"/></radialGradient>
+    <linearGradient id="front" x1="60" y1="70" x2="120" y2="42" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7FE9D8"/><stop offset="1" stop-color="#1FA9CE"/></linearGradient>
+    <linearGradient id="back" x1="8" y1="60" x2="66" y2="66" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#12456E"/><stop offset="1" stop-color="#1E86A8"/></linearGradient>
+    <clipPath id="globe"><circle cx="64" cy="64" r="30"/></clipPath>
+    <mask id="fronthalf" maskUnits="userSpaceOnUse" x="60" y="-40" width="140" height="220"><rect x="64" y="-40" width="136" height="220" fill="#fff"/></mask>
+  </defs>
+  <g transform="translate(140 8) scale(1.25)">
+    <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="url(#back)" stroke-width="5.5" stroke-linecap="round"/></g>
+    <circle cx="64" cy="64" r="30" fill="url(#sphere)"/>
+    <g clip-path="url(#globe)" fill="none" stroke="#CFF6FA" stroke-opacity="0.26" stroke-width="1.1">
+      <ellipse cx="64" cy="64" rx="11" ry="30"/><ellipse cx="64" cy="64" rx="22.5" ry="30"/>
+      <path d="M32 50Q64 58 96 50"/><path d="M32 64Q64 72 96 64"/><path d="M32 78Q64 86 96 78"/>
+    </g>
+    <circle cx="64" cy="64" r="30" fill="none" stroke="#07223C" stroke-opacity="0.35" stroke-width="1"/>
+    <g clip-path="url(#globe)"><g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="#062038" stroke-opacity="0.5" stroke-width="11" stroke-linecap="round" mask="url(#fronthalf)"/></g></g>
+    <g transform="rotate(-16 64 64)"><path d="M64 64C46 40 10 40 10 64C10 88 46 88 64 64C82 40 118 40 118 64C118 88 82 88 64 64Z" fill="none" stroke="url(#front)" stroke-width="6.2" stroke-linecap="round" mask="url(#fronthalf)"/></g>
+    <circle cx="64" cy="64" r="9.5" fill="#FF8A47" fill-opacity="0.18"/>
+    <circle cx="64" cy="64" r="5.4" fill="#FF8A47"/>
+  </g>
+  <text x="220" y="242" text-anchor="middle" font-family="Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="54" letter-spacing="-1.6" fill="#0B2038"><tspan font-weight="500">Plan</tspan><tspan font-weight="700">Sphere</tspan></text>
+  <text x="220" y="280" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" font-weight="500" letter-spacing="2.4" fill="#5A7A93">PLAN INFINITY AND TRAVEL BEYOND THE WORLD</text>
+</svg>

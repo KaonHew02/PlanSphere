@@ -16,8 +16,8 @@
 
 <div class="app">
 
-    <!-- The switch is a sidebar rather than a strip along the top: six modules
-         wanted six words each, and words in a row cost width the tables need.
+    <!-- The switch is a sidebar rather than a strip along the top: eight modules
+         wanted eight words each, and words in a row cost width the tables need.
          Down the side they cost nothing but a column that was empty anyway. -->
     <!-- Covers the page while the drawer is open, and closes it when tapped. -->
     <div class="scrim" id="navScrim" hidden></div>
@@ -30,19 +30,38 @@
         <p class="tagline">Plan Infinity and Travel <br>Beyond the World.</p>
         <nav class="tabs" id="tabs">
             <button type="button" data-module="dash" class="is-on">
-                <i class="bi bi-compass-fill"></i><span>Dashboard</span>
+                <i class="bi bi-house-door-fill"></i><span>Home</span>
+            </button>
+            <button type="button" data-module="cal">
+                <i class="bi bi-calendar3"></i><span>Calendar</span><em class="count" id="countToday" hidden></em>
             </button>
             <button type="button" data-module="trips">
-                <i class="bi bi-suitcase-lg-fill"></i><span>Trips</span><em class="count" id="countTrips" hidden></em>
+                <i class="bi bi-suitcase-lg-fill"></i><span>Trips &amp; Events</span><em class="count" id="countTrips" hidden></em>
             </button>
             <button type="button" data-module="plan">
                 <i class="bi bi-calendar2-week-fill"></i><span>Itinerary</span><em class="count" id="countStops" hidden></em>
             </button>
-            <button type="button" data-module="book">
-                <i class="bi bi-ticket-perforated-fill"></i><span>Bookings</span><em class="count" id="countBookings" hidden></em>
+            <button type="button" data-module="spend">
+                <i class="bi bi-cash-coin"></i><span>Expenses</span><em class="count" id="countSpend" hidden></em>
             </button>
             <button type="button" data-module="budget">
                 <i class="bi bi-wallet2"></i><span>Budget</span>
+            </button>
+            <button type="button" data-module="sum">
+                <i class="bi bi-bar-chart-fill"></i><span>Summary</span>
+            </button>
+
+            <!-- Below the rule: the three screens that answer to a
+                 numbered module rather than being one. Bookings feed the
+                 Expenses ledger, Convert is a calculator, and Packing is
+                 a list. -->
+            <span class="tab-rule"></span>
+
+            <button type="button" data-module="book">
+                <i class="bi bi-ticket-perforated-fill"></i><span>Bookings</span><em class="count" id="countBookings" hidden></em>
+            </button>
+            <button type="button" data-module="conv">
+                <i class="bi bi-currency-exchange"></i><span>Convert</span>
             </button>
             <button type="button" data-module="pack">
                 <i class="bi bi-bag-check-fill"></i><span>Packing</span><em class="count" id="countPack" hidden></em>
@@ -60,8 +79,8 @@
 
         <!-- Every module answers to this one control, so it lives above all of
              them rather than inside whichever screen happened to need it first. -->
-        <div class="trip-switch">
-            <label for="tripPick">Trip</label>
+        <div class="trip-switch" id="tripSwitch" hidden>
+            <label for="tripPick" id="tripLabel">Viewing</label>
             <select id="tripPick"></select>
         </div>
 
@@ -80,10 +99,175 @@
     <main class="main">
 
         <!-- ==============================================================
-             DASHBOARD — the overview.
-             It reads every other module and writes nothing.
+             MODULE 02 · CALENDAR & TIMELINE
+
+             Four views over one set of items, and the items come from four
+             places: activities the calendar owns, trips (as bars across
+             their dates), itinerary stops — the "what time, where" of a
+             trip — and bookings. Only the first is edited here. The rest
+             are windows into the module that owns them, and clicking one
+             goes there rather than pretending to be editable.
              ============================================================== -->
-        <section class="module" id="module-dash">
+        <section class="module" id="module-cal">
+
+            <div class="stack">
+
+                <section class="card is-bar">
+                    <div class="bar-row">
+                        <div class="cal-nav">
+                            <button type="button" class="ghost-btn" id="calPrev" title="Back"><i class="bi bi-chevron-left"></i></button>
+                            <button type="button" class="ghost-btn" id="calToday">Today</button>
+                            <button type="button" class="ghost-btn" id="calNext" title="Forward"><i class="bi bi-chevron-right"></i></button>
+                        </div>
+                        <h2 class="cal-title" id="calTitle">&mdash;</h2>
+                        <div class="seg is-compact" id="calView" data-value="month" style="margin-left:auto">
+                            <button type="button" data-val="month" class="is-on">Month</button>
+                            <button type="button" data-val="week">Week</button>
+                            <button type="button" data-val="day">Day</button>
+                            <button type="button" data-val="timeline">Timeline</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card is-bar">
+                    <div class="bar-row">
+                        <div class="cal-search">
+                            <i class="bi bi-search"></i>
+                            <input type="search" id="calSearch" placeholder="Search names, places and notes">
+                        </div>
+                        <div class="cal-pick">
+                            <i class="bi bi-flag"></i>
+                            <select id="holCountry" aria-label="Country for public holidays"
+                                    title="Public holidays follow this country, plus the country set on each trip"></select>
+                        </div>
+                        <div class="cal-cats" id="calCats"></div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2 id="calViewTitle">Month</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="calNote"></span>
+                            <button type="button" class="ghost-btn" id="calGoogle" hidden
+                                    title="Writes everything straight into a PlanSphere calendar in your Google account">
+                                <i class="bi bi-google"></i><span>Send to Google Calendar</span>
+                            </button>
+                            <!-- Parked while the reminder story is being decided.
+                                 The machinery is still in app.js and still tested:
+                                 exportIcs() writes the .ics, askReminders() asks for
+                                 permission, checkReminders() fires them. Putting
+                                 either button back is this markup and nothing else.
+
+                            <button type="button" class="ghost-btn" id="calExport"
+                                    title="Saves a calendar file (.ics). Open it on your phone and its own calendar imports everything, with the alarms.">
+                                <i class="bi bi-calendar-plus"></i><span>Add to phone calendar</span>
+                            </button>
+                            <button type="button" class="ghost-btn" id="calRemind"
+                                    title="Show reminders in this browser while the page is open">
+                                <i class="bi bi-bell"></i><span>Reminders off</span>
+                            </button>
+                                 -->
+                        </div>
+                    </div>
+                    <div id="calBody"></div>
+                    <p class="hint" id="calHint"><i class="bi bi-info-circle"></i>Drag an activity onto another day to move it. Trips are bars across their dates and move from the Trips screen.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2 id="actFormTitle">Add an activity</h2>
+                        <div class="card-actions">
+                            <button type="button" class="ghost-btn" id="actCancel" hidden>
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label for="actCat">Category</label>
+                            <select id="actCat"></select>
+                        </div>
+                        <div class="field">
+                            <label for="actDate">Date</label>
+                            <input type="date" id="actDate">
+                        </div>
+                        <div class="field">
+                            <label for="actTime">Starts <span class="per">leave empty for all day</span></label>
+                            <input type="time" id="actTime">
+                        </div>
+                        <div class="field">
+                            <label for="actEnd">Ends <span class="per">optional</span></label>
+                            <input type="time" id="actEnd">
+                        </div>
+                        <div class="field is-wide">
+                            <label for="actTitle">What</label>
+                            <input type="text" id="actTitle" placeholder="Company CSR day">
+                        </div>
+                        <div class="field">
+                            <label for="actWhere">Where <span class="per">optional</span></label>
+                            <input type="text" id="actWhere" placeholder="Head office, level 3">
+                        </div>
+                        <div class="field">
+                            <label for="actRemind">Remind me</label>
+                            <select id="actRemind">
+                                <option value="">No reminder</option>
+                                <option value="0">At the time</option>
+                                <option value="10">10 minutes before</option>
+                                <option value="30">30 minutes before</option>
+                                <option value="60">1 hour before</option>
+                                <option value="1440">1 day before</option>
+                            </select>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="actNote">Note <span class="per">optional</span></label>
+                            <textarea id="actNote" placeholder="Anything you will want to read on the day."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-foot">
+                        <button type="button" class="primary-btn" id="actSave">
+                            <i class="bi bi-plus-lg"></i><span id="actSaveLabel">Add activity</span>
+                        </button>
+                        <button type="button" class="ghost-btn" id="actGoogle" hidden
+                                title="Opens Google Calendar with this activity filled in">
+                            <i class="bi bi-google"></i>Add to Google Calendar
+                        </button>
+                        <button type="button" class="ghost-btn is-danger" id="actDrop" hidden>
+                            <i class="bi bi-trash3"></i>Delete
+                        </button>
+                        <p class="hint"><i class="bi bi-info-circle"></i>Trips, itinerary stops and bookings appear here on their own &mdash; they are added on their own screens.</p>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Categories</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="catNote"></span>
+                            <button type="button" class="ghost-btn" id="catAdd">
+                                <i class="bi bi-plus-lg"></i>Add category
+                            </button>
+                        </div>
+                    </div>
+                    <div id="catList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Changes save as you type. The Trip category is filled automatically from your trips, so it cannot be deleted &mdash; but it can be renamed and recoloured like any other.</p>
+                </section>
+
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             MODULE 01 · HOME DASHBOARD
+
+             What is happening, and nothing else. The countdown, the next
+             few stops, what is still unpaid, how far the packing has got
+             and what is left to settle — the five things somebody opens
+             the app to check. Anything that needs adding up is a screen
+             along, in Summary & Analytics.
+             ============================================================== -->
+        <section class="module" id="module-dash" hidden>
 
             <div class="hero">
                 <div class="hero-main">
@@ -128,14 +312,6 @@
                     <div id="dashHold"></div>
                 </section>
 
-                <section class="card is-wide">
-                    <div class="card-head">
-                        <h2>Where the money goes</h2>
-                        <span class="card-note" id="dashSpendNote"></span>
-                    </div>
-                    <div id="dashSpend"></div>
-                </section>
-
                 <section class="card">
                     <div class="card-head">
                         <h2>Packing</h2>
@@ -146,26 +322,124 @@
 
                 <section class="card">
                     <div class="card-head">
-                        <h2>The trip in figures</h2>
+                        <h2>Settling up</h2>
+                        <span class="card-note" id="dashSettleNote"></span>
                     </div>
-                    <div id="dashFigures"></div>
+                    <div id="dashSettle"></div>
                 </section>
 
             </div>
         </section>
 
         <!-- ==============================================================
-             TRIPS — the only module that creates anything the others need.
+             MODULE 06 · SUMMARY & ANALYTICS
+
+             The other half of the old dashboard: everything that has to
+             be added up. It reads every module and writes to none of
+             them, which is what makes it safe to state every figure in
+             the app on one page — and why none of them are worked out
+             here rather than by the module that owns them.
              ============================================================== -->
-        <section class="module" id="module-trips" hidden>
+        <section class="module" id="module-sum" hidden>
 
             <div class="stack">
 
                 <section class="card">
                     <div class="card-head">
-                        <h2 id="tripFormTitle">Add a trip</h2>
+                        <h2 id="sumTitle">At a glance</h2>
+                        <span class="card-note" id="sumHeadNote"></span>
+                    </div>
+                    <div id="sumTop"></div>
+                </section>
+
+                <section class="card" id="sumEventCard" hidden>
+                    <div class="card-head">
+                        <h2>Event analytics</h2>
+                        <span class="card-note" id="sumEventNote"></span>
+                    </div>
+                    <div id="sumEvent"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Cost per person is what was actually spent over the people who actually came &mdash; the ones who did not are not what it cost.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Expense breakdown</h2>
+                        <span class="card-note" id="sumSpendNote"></span>
+                    </div>
+                    <div id="sumSpend"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Useful statistics</h2>
+                        <span class="card-note" id="sumStatNote"></span>
+                    </div>
+                    <div id="sumStats"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Spending by person</h2>
+                        <span class="card-note" id="sumPeopleNote"></span>
+                    </div>
+                    <div id="sumPeople"></div>
+                </section>
+
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             MODULE 03 · TRIP & EVENT MANAGEMENT
+
+             The only module that creates the thing the rest hang off. A
+             trip, an event and an activity are the same record with a
+             different word on it — all three own days, bookings, a budget
+             and a list — so they are one form and one shelf, not three.
+             ============================================================== -->
+        <section class="module" id="module-trips" hidden>
+
+            <div class="stack">
+
+                <section class="card is-bar">
+                    <div class="bar-row">
+                        <div class="new-wrap">
+                            <button type="button" class="primary-btn" id="newOpen"
+                                    aria-haspopup="true" aria-expanded="false" aria-controls="newMenu">
+                                <i class="bi bi-plus-lg"></i>Create New
+                            </button>
+                            <!-- Three buttons rather than a kind field inside the
+                                 form: the choice changes what the form asks for,
+                                 so it is made before the form, not inside it. -->
+                            <div class="new-menu" id="newMenu" hidden role="menu">
+                                <button type="button" role="menuitem" data-new="trip">
+                                    <span class="mk">&#x1F30E;</span>
+                                    <b>Trip</b><small>Somewhere you are going, across days</small>
+                                </button>
+                                <button type="button" role="menuitem" data-new="event">
+                                    <span class="mk">&#x1F389;</span>
+                                    <b>Event</b><small>A gathering with a date and a budget</small>
+                                </button>
+                                <button type="button" role="menuitem" data-new="activity">
+                                    <span class="mk">&#x1F4C5;</span>
+                                    <b>Activity</b><small>One day, one thing</small>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="seg is-compact is-wrap" id="tripFilter" data-value="all" style="margin-left:auto">
+                            <button type="button" data-val="all" class="is-on">All</button>
+                            <button type="button" data-val="trip">&#x1F30E; Trips</button>
+                            <button type="button" data-val="event">&#x1F389; Events</button>
+                            <button type="button" data-val="activity">&#x1F4C5; Activities</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card" id="tripFormCard" hidden>
+                    <div class="card-head">
+                        <h2 id="tripFormTitle">Trip information</h2>
                         <div class="card-actions">
-                            <button type="button" class="ghost-btn" id="tripCancel" hidden>
+                            <button type="button" class="ghost-btn" id="tripCancel">
                                 <i class="bi bi-x-lg"></i>Cancel
                             </button>
                         </div>
@@ -173,31 +447,70 @@
 
                     <div class="field-grid">
                         <div class="field is-wide">
-                            <label for="tripName">Trip name</label>
+                            <label for="tripName" id="tripNameLabel">Trip name</label>
                             <input type="text" id="tripName" placeholder="Kyoto &amp; Osaka">
                         </div>
                         <div class="field">
-                            <label for="tripWhere">Destination</label>
+                            <label for="tripType">Type</label>
+                            <div class="field-pair">
+                                <select id="tripType"></select>
+                                <button type="button" class="ghost-btn is-narrow" id="tripTypeAdd"
+                                        title="Add a type of your own">&#xFF0B;&nbsp;Add type</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="tripStatus">Status</label>
+                            <select id="tripStatus"></select>
+                        </div>
+                        <div class="field">
+                            <label for="tripWhere" id="tripWhereLabel">Destination</label>
                             <input type="text" id="tripWhere" placeholder="Japan">
                         </div>
                         <div class="field">
-                            <label for="tripFrom">Leaves</label>
+                            <label for="tripCountry">Country <span class="per">for its public holidays</span></label>
+                            <select id="tripCountry"></select>
+                        </div>
+                        <div class="field">
+                            <label for="tripFrom" id="tripFromLabel">Start date</label>
                             <input type="date" id="tripFrom">
                         </div>
                         <div class="field">
-                            <label for="tripTo">Returns</label>
+                            <label for="tripTo">End date</label>
                             <input type="date" id="tripTo">
                         </div>
                         <div class="field">
-                            <label for="tripWho">Travellers</label>
+                            <label for="tripWho">Members</label>
                             <input type="number" id="tripWho" min="1" step="1" placeholder="2">
                         </div>
                         <div class="field">
-                            <label for="tripBudget">Budget <span class="per">for the whole trip</span></label>
-                            <div class="money-input">
-                                <span class="affix">RM</span>
+                            <label for="tripHome">Currency <span class="per">what totals are shown in</span></label>
+                            <select id="tripHome"></select>
+                        </div>
+                        <div class="field">
+                            <label for="tripBudget">Budget <span class="per">for the whole of it</span></label>
+                            <div class="money-input is-bare">
                                 <input type="number" id="tripBudget" min="0" step="0.01" placeholder="0.00">
                             </div>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="tripDesc">Description <span class="per">optional</span></label>
+                            <textarea id="tripDesc" placeholder="What this one is, in a line or two."></textarea>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="tripCoverAdd">Cover image <span class="per">optional</span></label>
+                            <div class="cover-pick">
+                                <div class="cover-shot" id="tripCoverShot" hidden></div>
+                                <div class="cover-acts">
+                                    <button type="button" class="ghost-btn" id="tripCoverAdd">
+                                        <i class="bi bi-image"></i><span id="tripCoverAddLabel">Choose an image</span>
+                                    </button>
+                                    <button type="button" class="ghost-btn is-danger" id="tripCoverDrop" hidden>
+                                        <i class="bi bi-x-lg"></i>Remove
+                                    </button>
+                                    <span class="cover-note" id="tripCoverNote">Scaled down before it is stored, so one photo cannot fill the store.</span>
+                                </div>
+                            </div>
+                            <input type="file" id="tripCoverFile" accept="image/*" hidden>
                         </div>
                     </div>
 
@@ -211,17 +524,31 @@
 
                 <section class="card">
                     <div class="card-head">
-                        <h2>Your trips</h2>
+                        <h2 id="tripsTitle">Trips &amp; events</h2>
                         <span class="card-note" id="tripsNote"></span>
                     </div>
                     <div id="tripsList"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Types</h2>
+                        <span class="card-note" id="typeNote"></span>
+                    </div>
+                    <div id="typeList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Names save as you type. Activities pick from the event list &mdash; an activity is an event with one day in it.</p>
                 </section>
 
             </div>
         </section>
 
         <!-- ==============================================================
-             ITINERARY — days down the page, stops inside them.
+             MODULE 04 · SCHEDULE & ITINERARY
+
+             Days down the page, stops inside them. Every stop carries what
+             it is meant to cost and, once it has happened, what it did —
+             the second figure read from the expense record rather than
+             typed twice.
              ============================================================== -->
         <section class="module" id="module-plan" hidden>
 
@@ -236,6 +563,10 @@
                             <button type="button" data-val="stay">Stays</button>
                             <button type="button" data-val="food">Food</button>
                             <button type="button" data-val="do">Activities</button>
+                        </div>
+                        <div class="seg is-compact is-wrap" id="planState" data-value="live" style="margin-left:auto">
+                            <button type="button" data-val="live" class="is-on">Still on</button>
+                            <button type="button" data-val="all">Everything</button>
                         </div>
                     </div>
                 </section>
@@ -252,15 +583,11 @@
 
                     <div class="field-grid">
                         <div class="field">
-                            <label for="stopDate">Day</label>
+                            <label for="stopDate">Date</label>
                             <input type="date" id="stopDate">
                         </div>
                         <div class="field">
-                            <label for="stopTime">Time <span class="per">optional</span></label>
-                            <input type="time" id="stopTime">
-                        </div>
-                        <div class="field">
-                            <label for="stopKind">Kind</label>
+                            <label for="stopKind">Activity type</label>
                             <select id="stopKind">
                                 <option value="travel">Travel</option>
                                 <option value="stay">Stay</option>
@@ -271,19 +598,74 @@
                             </select>
                         </div>
                         <div class="field">
-                            <label for="stopCost">Cost <span class="per">optional</span></label>
-                            <div class="money-input">
-                                <span class="affix">RM</span>
-                                <input type="number" id="stopCost" min="0" step="0.01" placeholder="0.00">
-                            </div>
+                            <label for="stopTime">Start time <span class="per">optional</span></label>
+                            <input type="time" id="stopTime">
+                        </div>
+                        <div class="field">
+                            <label for="stopEnd">End time <span class="per">optional</span></label>
+                            <input type="time" id="stopEnd">
+                        </div>
+                        <div class="field">
+                            <label for="stopMins">Duration <span class="per" id="stopMinsPer">minutes &mdash; sets the end time</span></label>
+                            <input type="number" id="stopMins" min="0" step="5" placeholder="90">
+                        </div>
+                        <div class="field">
+                            <label for="stopStatus">Status</label>
+                            <select id="stopStatus"></select>
                         </div>
                         <div class="field is-wide">
-                            <label for="stopTitle">What</label>
+                            <label for="stopTitle">Title</label>
                             <input type="text" id="stopTitle" placeholder="Fushimi Inari at first light">
                         </div>
                         <div class="field is-wide">
-                            <label for="stopWhere">Where <span class="per">optional</span></label>
+                            <label for="stopWhere">Location <span class="per">optional</span></label>
                             <input type="text" id="stopWhere" placeholder="68 Fukakusa Yabunouchicho, Fushimi Ward">
+                        </div>
+                        <div class="field is-wide">
+                            <label for="stopDesc">Description <span class="per">optional</span></label>
+                            <textarea id="stopDesc" placeholder="What this stop is, in a line or two."></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="stopCost">Estimated cost <span class="per">what you expect to pay</span></label>
+                            <div class="field-pair">
+                                <div class="money-input is-bare">
+                                    <input type="number" id="stopCost" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <select id="stopCur" class="is-narrow" aria-label="Currency"></select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="stopActualSrc">Actual cost <span class="per">what it really came to</span></label>
+                            <select id="stopActualSrc"></select>
+                        </div>
+                        <div class="field" id="stopActualField" hidden>
+                            <label for="stopActual">Actual amount</label>
+                            <div class="field-pair">
+                                <div class="money-input is-bare">
+                                    <input type="number" id="stopActual" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <select id="stopActualCur" class="is-narrow" aria-label="Currency"></select>
+                            </div>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="stopNote">Notes <span class="per">optional &mdash; anything you will want to read on the day</span></label>
+                            <textarea id="stopNote" placeholder="Ticket office opens at 8. Cash only."></textarea>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="stopAttAdd">Attachment <span class="per">optional</span></label>
+                            <div class="att-pick">
+                                <div class="att-held" id="stopAttHeld" hidden></div>
+                                <div class="att-acts">
+                                    <button type="button" class="ghost-btn" id="stopAttAdd">
+                                        <i class="bi bi-paperclip"></i><span id="stopAttAddLabel">Choose a file</span>
+                                    </button>
+                                    <button type="button" class="ghost-btn is-danger" id="stopAttDrop" hidden>
+                                        <i class="bi bi-x-lg"></i>Remove
+                                    </button>
+                                    <span class="att-note" id="stopAttNote">A ticket, a booking slip, a photo of the door code. Images are scaled down; anything over 1&nbsp;MB is turned away.</span>
+                                </div>
+                            </div>
+                            <input type="file" id="stopAttFile" hidden>
                         </div>
                     </div>
 
@@ -347,9 +729,11 @@
                         </div>
                         <div class="field">
                             <label for="bookCost">Cost</label>
-                            <div class="money-input">
-                                <span class="affix">RM</span>
-                                <input type="number" id="bookCost" min="0" step="0.01" placeholder="0.00">
+                            <div class="field-pair">
+                                <div class="money-input is-bare">
+                                    <input type="number" id="bookCost" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <select id="bookCur" class="is-narrow" aria-label="Currency"></select>
                             </div>
                         </div>
                         <div class="field is-wide">
@@ -386,30 +770,602 @@
         </section>
 
         <!-- ==============================================================
-             BUDGET — the trip's money, by kind.
-             It writes nothing: every figure here is a booking or a stop.
+             MODULE 05 · EXPENSE MANAGER
+
+             What money actually left, as opposed to what was planned to.
+             The Itinerary reads back from here: a schedule item's Actual
+             cost is one of these records, read live rather than copied.
              ============================================================== -->
-        <section class="module" id="module-budget" hidden>
+        <section class="module" id="module-spend" hidden>
 
             <div class="stack">
-
                 <section class="card is-bar">
                     <div class="bar-row">
-                        <span class="bar-label"><i class="bi bi-wallet2"></i> Trip budget</span>
-                        <div class="money-input money-input-sm" style="max-width: 190px">
-                            <span class="affix">RM</span>
-                            <input type="number" id="budgetTotal" min="0" step="0.01" placeholder="0.00">
+                        <button type="button" class="primary-btn" id="spendAdd">
+                            <i class="bi bi-plus-lg"></i>Add expense
+                        </button>
+                        <span class="card-note" id="spendNote" style="margin-left:auto"></span>
+                    </div>
+                </section>
+
+                <section class="card" id="spendFormCard" hidden>
+                    <div class="card-head">
+                        <h2 id="spendFormTitle">New expense</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="spendRef"></span>
+                            <button type="button" class="ghost-btn" id="spendCancel">
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
                         </div>
-                        <span class="card-note" id="budgetPerHead"></span>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label for="spendDate">Date</label>
+                            <input type="date" id="spendDate">
+                        </div>
+                        <div class="field">
+                            <label for="spendTime">Time <span class="per">optional</span></label>
+                            <input type="time" id="spendTime">
+                        </div>
+                        <div class="field">
+                            <label for="spendCat">Category</label>
+                            <select id="spendCat"></select>
+                        </div>
+                        <div class="field">
+                            <label for="spendBy">Paid by</label>
+                            <select id="spendBy"></select>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="spendMerchant">Merchant</label>
+                            <input type="text" id="spendMerchant" placeholder="ABC Vegetarian Restaurant">
+                        </div>
+                        <div class="field is-wide">
+                            <label for="spendDesc">Description <span class="per">optional</span></label>
+                            <input type="text" id="spendDesc" placeholder="Dinner, five of us">
+                        </div>
+                        <div class="field">
+                            <label for="spendAmount">Amount</label>
+                            <div class="field-pair">
+                                <div class="money-input is-bare">
+                                    <input type="number" id="spendAmount" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <select id="spendCur" class="is-narrow" aria-label="Currency"></select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="spendStop">Against a schedule item <span class="per">optional</span></label>
+                            <select id="spendStop"></select>
+                        </div>
+
+                        <div class="field is-wide">
+                            <label>Participants <span class="per">who this was for</span></label>
+                            <div class="who-pick" id="spendWho"></div>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="spendSplit">Split method</label>
+                            <div class="seg is-wrap" id="spendSplit" data-value="equal">
+                                <button type="button" data-val="equal" class="is-on">Equal</button>
+                                <button type="button" data-val="percent">Percentage</button>
+                                <button type="button" data-val="exact">Custom amount</button>
+                            </div>
+                            <div class="split-rows" id="spendParts" hidden></div>
+                            <p class="hint" id="spendSplitHint"><i class="bi bi-info-circle"></i>Split evenly between everybody ticked.</p>
+                        </div>
+
+                        <div class="field is-wide">
+                            <label for="spendNoteText">Notes <span class="per">optional</span></label>
+                            <textarea id="spendNoteText" rows="2" placeholder="Anything worth remembering about this one."></textarea>
+                        </div>
+
+                        <div class="field">
+                            <label for="spendReceiptAdd">Receipt <span class="per">optional</span></label>
+                            <div class="att-pick">
+                                <div class="att-held" id="spendReceiptShot" hidden></div>
+                                <div class="att-acts">
+                                    <button type="button" class="ghost-btn" id="spendReceiptAdd">
+                                        <i class="bi bi-receipt"></i><span id="spendReceiptLabel">Add receipt</span>
+                                    </button>
+                                    <button type="button" class="ghost-btn is-danger" id="spendReceiptDrop" hidden>
+                                        <i class="bi bi-x-lg"></i>Remove
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="file" id="spendReceiptFile" accept="image/*,application/pdf" hidden>
+                        </div>
+                        <div class="field">
+                            <label for="spendAttAdd">Attachments <span class="per">optional</span></label>
+                            <div class="att-pick is-stack">
+                                <div class="att-shelf" id="spendAttList" hidden></div>
+                                <div class="att-acts">
+                                    <button type="button" class="ghost-btn" id="spendAttAdd">
+                                        <i class="bi bi-paperclip"></i>Add files
+                                    </button>
+                                    <span class="att-note" id="spendAttNote">Anything else that belongs to this expense.</span>
+                                </div>
+                            </div>
+                            <input type="file" id="spendAttFile" multiple hidden>
+                        </div>
+                    </div>
+
+                    <div class="form-foot">
+                        <button type="button" class="primary-btn" id="spendSave">
+                            <i class="bi bi-plus-lg"></i><span id="spendSaveLabel">Add expense</span>
+                        </button>
+                        <p class="hint"><i class="bi bi-info-circle"></i>Every expense belongs to whatever is open in the top bar.</p>
                     </div>
                 </section>
 
                 <section class="card">
                     <div class="card-head">
-                        <h2>Against the budget</h2>
+                        <h2>Expenses</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="spendListNote"></span>
+                        </div>
+                    </div>
+                    <div class="cal-cats" id="spendCatChips" style="margin-bottom:18px"></div>
+                    <div id="spendList"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Where it went</h2>
+                        <span class="card-note" id="spendTotalNote"></span>
+                    </div>
+                    <div id="spendSummary"></div>
+                </section>
+
+                <!-- ------------------------------------------------------
+                     PEOPLE & PARTICIPANTS
+
+                     Here rather than on the Trips screen because this is
+                     where names are used: an expense is split between
+                     people, and a person who is not on the list cannot be
+                     ticked. Everything else about them — the phone number,
+                     the role, whether they turned up — hangs off the same
+                     row rather than off a second list somewhere else.
+                     ------------------------------------------------------ -->
+                <section class="card">
+                    <div class="card-head">
+                        <h2>People &amp; participants</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="peopleNote"></span>
+                            <button type="button" class="ghost-btn" id="peopleAdd">
+                                <i class="bi bi-person-plus"></i>Add person
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="head-count" id="peopleCount" hidden></div>
+
+                    <div class="person-form" id="personForm" hidden>
+                        <div class="field-grid">
+                            <div class="field is-wide">
+                                <label for="personName">Name</label>
+                                <input type="text" id="personName" placeholder="Alice Tan">
+                            </div>
+                            <div class="field">
+                                <label for="personRole">Role</label>
+                                <div class="field-pair">
+                                    <select id="personRole"></select>
+                                    <button type="button" class="ghost-btn is-narrow" id="personRoleAdd"
+                                            title="Add a role of your own">&#xFF0B;&nbsp;Add role</button>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="personStatus">Status</label>
+                                <select id="personStatus"></select>
+                            </div>
+                            <div class="field">
+                                <label for="personPhone">Phone <span class="per">optional</span></label>
+                                <input type="tel" id="personPhone" placeholder="+60 12-345 6789">
+                            </div>
+                            <div class="field">
+                                <label for="personEmail">Email <span class="per">optional</span></label>
+                                <input type="email" id="personEmail" placeholder="alice@example.com">
+                            </div>
+                            <div class="field is-wide">
+                                <label for="personNote">Notes <span class="per">optional</span></label>
+                                <textarea id="personNote" rows="2" placeholder="Dietary requirements, shirt size, who they are travelling with."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-foot">
+                            <button type="button" class="primary-btn" id="personSave">
+                                <i class="bi bi-plus-lg"></i><span id="personSaveLabel">Add person</span>
+                            </button>
+                            <button type="button" class="ghost-btn" id="personCancel">
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="peopleList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>The Members count on the Trips screen follows this list once anybody is named. Nobody has to be on every expense &mdash; whoever is not ticked has a share of nothing.</p>
+                </section>
+
+                <!-- ------------------------------------------------------
+                     RECEIPT & DOCUMENT SCANNER
+
+                     Part of this module rather than one of its own,
+                     because what a scan produces is an expense. The reader
+                     runs in the browser — nothing is uploaded anywhere —
+                     and everything it finds is a suggestion sitting in a
+                     field somebody can correct before it is saved.
+                     ------------------------------------------------------ -->
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Scan a receipt or a document</h2>
+                        <span class="card-note" id="scanNote"></span>
+                    </div>
+
+                    <div class="scan-stage" id="scanStage">
+                        <div class="scan-shot" id="scanShot">
+                            <video id="scanVideo" playsinline muted hidden></video>
+                            <img id="scanImage" alt="" hidden>
+                            <div class="scan-blank" id="scanBlank">
+                                <i class="bi bi-camera"></i>
+                                <p>Point a camera at it, or pick a photo you already have.</p>
+                            </div>
+                        </div>
+
+                        <div class="scan-side">
+                            <div class="scan-acts">
+                                <button type="button" class="primary-btn" id="scanOpen">
+                                    <i class="bi bi-camera-fill"></i><span id="scanOpenLabel">Take photo</span>
+                                </button>
+                                <button type="button" class="ghost-btn" id="scanPick">
+                                    <i class="bi bi-image"></i>Choose a photo
+                                </button>
+                                <button type="button" class="ghost-btn" id="scanShoot" hidden>
+                                    <i class="bi bi-record-circle"></i>Capture
+                                </button>
+                                <button type="button" class="ghost-btn" id="scanAgain" hidden>
+                                    <i class="bi bi-arrow-counterclockwise"></i>Start again
+                                </button>
+                            </div>
+                            <p class="hint" id="scanHint"><i class="bi bi-info-circle"></i>The reading happens on this device. Nothing is uploaded.</p>
+                            <div class="scan-progress" id="scanProgress" hidden>
+                                <span class="sp-track"><span class="sp-fill" id="scanBar"></span></span>
+                                <span class="sp-say" id="scanSay">Reading…</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="scan-found" id="scanFound" hidden>
+                        <div class="card-head" style="margin-top:22px">
+                            <h2>What it found</h2>
+                            <span class="card-note" id="scanFoundNote"></span>
+                        </div>
+
+                        <div class="field-grid">
+                            <div class="field is-wide">
+                                <label for="scanMerchant">Merchant</label>
+                                <input type="text" id="scanMerchant" placeholder="Nobody found — type it in">
+                            </div>
+                            <div class="field">
+                                <label for="scanDate">Date</label>
+                                <input type="date" id="scanDate">
+                            </div>
+                            <div class="field">
+                                <label for="scanTotal">Total</label>
+                                <div class="field-pair">
+                                    <div class="money-input is-bare">
+                                        <input type="number" id="scanTotal" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                    <select id="scanCur" class="is-narrow" aria-label="Currency"></select>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="scanCat">Suggested category</label>
+                                <select id="scanCat"></select>
+                            </div>
+                            <div class="field">
+                                <label for="scanKind">File it as</label>
+                                <select id="scanKind"></select>
+                            </div>
+                        </div>
+
+                        <details class="scan-raw" id="scanRawWrap">
+                            <summary>What the reader actually saw</summary>
+                            <pre id="scanRaw"></pre>
+                        </details>
+
+                        <div class="form-foot">
+                            <button type="button" class="primary-btn" id="scanConfirm">
+                                <i class="bi bi-check-lg"></i>Confirm &amp; create expense
+                            </button>
+                            <button type="button" class="ghost-btn" id="scanFile">
+                                <i class="bi bi-folder-plus"></i>File as a document only
+                            </button>
+                            <p class="hint"><i class="bi bi-info-circle"></i>Everything above is a guess. Correct it here, or on the expense form after.</p>
+                        </div>
+                    </div>
+
+                    <input type="file" id="scanFileInput" accept="image/*" capture="environment" hidden>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Documents</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="docNote"></span>
+                        </div>
+                    </div>
+                    <div class="cal-cats" id="docChips" style="margin-bottom:18px"></div>
+                    <div id="docList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Every document belongs to what is open in the top bar, and can be tied to a day on the plan or to an expense.</p>
+                </section>
+
+                <section class="card" id="docFormCard" hidden>
+                    <div class="card-head">
+                        <h2 id="docFormTitle">Document</h2>
+                        <div class="card-actions">
+                            <button type="button" class="ghost-btn" id="docCancel">
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field-grid">
+                        <div class="field is-wide">
+                            <label for="docTitle">Title</label>
+                            <input type="text" id="docTitle" placeholder="MH052 boarding pass">
+                        </div>
+                        <div class="field">
+                            <label for="docKind">Type</label>
+                            <select id="docKind"></select>
+                        </div>
+                        <div class="field">
+                            <label for="docDate">Date <span class="per">optional</span></label>
+                            <input type="date" id="docDate">
+                        </div>
+                        <div class="field">
+                            <label for="docStop">Against a schedule item <span class="per">optional</span></label>
+                            <select id="docStop"></select>
+                        </div>
+                        <div class="field">
+                            <label for="docSpend">Against an expense <span class="per">optional</span></label>
+                            <select id="docSpend"></select>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="docNoteText">Note <span class="per">optional</span></label>
+                            <textarea id="docNoteText" rows="2" placeholder="Reference numbers, gate, anything worth having to hand."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-foot">
+                        <button type="button" class="primary-btn" id="docSave">
+                            <i class="bi bi-check-lg"></i><span id="docSaveLabel">Save document</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- ------------------------------------------------------
+                     NOTES & INFORMATION
+
+                     Everything that belongs to the trip but not to a
+                     minute of it — filed here beside the people and the
+                     receipts, because these are the four things that hang
+                     off a trip rather than off its clock. A note pinned to
+                     a day still shows on that day up in the Itinerary,
+                     which is the join between the two screens.
+                     ------------------------------------------------------ -->
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Notes &amp; information</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="noteNote"></span>
+                            <button type="button" class="ghost-btn" id="noteAdd">
+                                <i class="bi bi-plus-lg"></i>Add note
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cal-cats" id="noteChips" style="margin-bottom:18px"></div>
+
+                    <div class="note-form" id="noteForm" hidden>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="noteType">Note type</label>
+                                <select id="noteType"></select>
+                            </div>
+                            <div class="field">
+                                <label for="noteDate">Day <span class="per">leave empty for the whole trip</span></label>
+                                <input type="date" id="noteDate">
+                            </div>
+                            <div class="field is-wide">
+                                <label for="noteTitle">Title</label>
+                                <input type="text" id="noteTitle" placeholder="Da Nang travel notes">
+                            </div>
+                            <div class="field is-wide">
+                                <label for="noteBody">Note <span class="per">a line starting with * or - becomes a bullet</span></label>
+                                <textarea id="noteBody" rows="7" placeholder="Things to remember:&#10;* Bring passport&#10;* Bring power bank&#10;* Download offline map"></textarea>
+                            </div>
+                            <div class="field is-wide">
+                                <label for="noteLinks">Links <span class="per">one per line &mdash; <code>name | https://…</code>, or just the address</span></label>
+                                <textarea id="noteLinks" rows="3" placeholder="Hotel booking | https://booking.com/…&#10;https://maps.app.goo.gl/…"></textarea>
+                            </div>
+                            <div class="field is-wide">
+                                <label for="noteAttAdd">Images, documents &amp; attachments</label>
+                                <div class="att-pick is-stack">
+                                    <div class="att-shelf" id="noteAttList" hidden></div>
+                                    <div class="att-acts">
+                                        <button type="button" class="ghost-btn" id="noteAttAdd">
+                                            <i class="bi bi-paperclip"></i>Add files
+                                        </button>
+                                        <span class="att-note" id="noteAttNote">Images are scaled down; anything else is kept as it is, up to 1&nbsp;MB each.</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="noteAttFile" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple hidden>
+                            </div>
+                        </div>
+
+                        <div class="form-foot">
+                            <button type="button" class="primary-btn" id="noteSave">
+                                <i class="bi bi-plus-lg"></i><span id="noteSaveLabel">Add note</span>
+                            </button>
+                            <button type="button" class="ghost-btn" id="noteCancel">
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="noteList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>A note pinned to a day shows in that day's heading on the Itinerary, and clicking it there comes back to this card. One left on the whole trip is always there.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Who paid, who owes</h2>
+                        <span class="card-note" id="spendOweNote"></span>
+                    </div>
+                    <div id="spendOwe"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>A balance is what somebody put in less what they used. Above the line they should receive; below it they need to pay.</p>
+                </section>
+
+                <!-- ------------------------------------------------------
+                     SPLIT & SETTLEMENT
+
+                     The balances say who is up and who is down. This says
+                     who hands what to whom, which is the question people
+                     actually have at the end of a trip.
+                     ------------------------------------------------------ -->
+                <section class="card">
+                    <div class="card-head">
+                        <h2>&#x1F4B8; Settlement</h2>
+                        <span class="card-note" id="settleNote"></span>
+                    </div>
+                    <div id="settleList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>The transfers are worked out from the expenses every time this is drawn. What is stored is what has actually been handed over.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Categories</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="spendCatNote"></span>
+                            <button type="button" class="ghost-btn" id="spendCatAdd">
+                                <i class="bi bi-plus-lg"></i>Add category
+                            </button>
+                        </div>
+                    </div>
+                    <div id="spendCatList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Ten to start with, and they are rows rather than a fixed list &mdash; rename them, recolour them, add your own.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Roles</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="roleNote"></span>
+                            <button type="button" class="ghost-btn" id="roleAdd">
+                                <i class="bi bi-plus-lg"></i>Add role
+                            </button>
+                        </div>
+                    </div>
+                    <div id="roleList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Names save as you type. Deleting one leaves the people who held it without a role rather than taking them with it.</p>
+                </section>
+
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             BUDGET — what Summary & Analytics measures against.
+
+             What was meant to be spent, against what was. The actual
+             figure comes from the Expenses ledger — this module owns the
+             expectations and nothing else, which is why every number on
+             the left of a comparison is typed and every number on the
+             right is read.
+             ============================================================== -->
+        <section class="module" id="module-budget" hidden>
+
+            <div class="stack">
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2 id="budgetTitle">Where the budget stands</h2>
                         <span class="card-note" id="budgetNote"></span>
                     </div>
-                    <div id="budgetBars"></div>
+                    <div id="budgetHead"></div>
+                </section>
+
+                <section class="card" id="budgetWarnCard" hidden>
+                    <div class="card-head">
+                        <h2>&#x26A0;&#xFE0F; Warnings</h2>
+                        <span class="card-note" id="budgetWarnNote"></span>
+                    </div>
+                    <div id="budgetWarns"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>A warning at nine tenths of a budget, and a different one past it. Nothing is blocked &mdash; a budget is a plan, not a rule.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>What you meant to spend</h2>
+                        <span class="card-note" id="budgetCurTag"></span>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label for="budgetTotal">Overall budget <span class="per">for the whole of it</span></label>
+                            <div class="money-input is-bare">
+                                <input type="number" id="budgetTotal" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <span class="budget-sub" id="budgetTotalSub"></span>
+                        </div>
+                        <div class="field">
+                            <label for="budgetHead1">Per person <span class="per">what each is expected to use</span></label>
+                            <div class="money-input is-bare">
+                                <input type="number" id="budgetHead1" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <span class="budget-sub" id="budgetHeadSub"></span>
+                        </div>
+                        <div class="field">
+                            <label for="budgetDay">Per day <span class="per">what a day is expected to cost</span></label>
+                            <div class="money-input is-bare">
+                                <input type="number" id="budgetDay" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <span class="budget-sub" id="budgetDaySub"></span>
+                        </div>
+                    </div>
+
+                    <div class="card-head" style="margin-top:26px">
+                        <h2>Category budgets</h2>
+                        <span class="card-note" id="budgetCatNote"></span>
+                    </div>
+                    <div id="budgetCats"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Leave one empty and that category is simply not measured. The categories are the Expenses ones &mdash; rename or add there and they appear here.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Per person</h2>
+                        <span class="card-note" id="budgetPeopleNote"></span>
+                    </div>
+                    <div id="budgetPeople"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>A person's actual is their <b>share</b> of the expenses, not what they happened to pay &mdash; the split decides it, and the Settlement squares it up after.</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Day by day</h2>
+                        <span class="card-note" id="budgetDaysNote"></span>
+                    </div>
+                    <div id="budgetDays"></div>
+                </section>
+
+                <section class="card" id="rateCard" hidden>
+                    <div class="card-head">
+                        <h2>Rates this trip is read through</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="rateNote"></span>
+                            <button type="button" class="fx-btn" id="rateFetch">
+                                <i class="bi bi-arrow-repeat"></i><span>Fill from today's rates</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="fx-line" id="rateFx" hidden style="margin-bottom:14px"></div>
+                    <div id="rateRows"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Every foreign amount keeps what was actually paid. These rates only decide what it is counted as in the total &mdash; change one and every figure re-reads, but nothing is rewritten.</p>
                 </section>
 
                 <section class="card">
@@ -418,6 +1374,85 @@
                         <span class="card-note" id="budgetTableNote"></span>
                     </div>
                     <div id="budgetTable"></div>
+                </section>
+
+            </div>
+        </section>
+
+        <!-- ==============================================================
+             CONVERT
+
+             A money changer's calculator, and deliberately nothing more. No
+             balances, no history, no live rates — you type the rate off the
+             board in front of you, because that is the rate you are actually
+             getting. An API would only ever tell you the mid-market one.
+             ============================================================== -->
+        <section class="module" id="module-conv" hidden>
+
+            <div class="stack">
+
+                <section class="card" id="convertCard">
+                    <div class="card-head">
+                        <h2>What will I get?</h2>
+                        <span class="card-note" id="convNote"></span>
+                    </div>
+
+                    <div class="cur-row">
+                        <div class="field">
+                            <label for="convHome">Base currency</label>
+                            <select id="convHome"></select>
+                        </div>
+                        <button type="button" class="swap-btn" id="convSwap" title="Swap the direction">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </button>
+                        <div class="field">
+                            <label for="convForeign">Other currency</label>
+                            <select id="convForeign"></select>
+                        </div>
+                    </div>
+
+                    <div class="rate-line" style="margin-top:18px">
+                        <span class="fixed" id="convRateFrom">1 MYR&nbsp;&nbsp;=</span>
+                        <input type="number" id="convRate" min="0" step="any" placeholder="0.00">
+                        <span class="fixed" id="convRateTo">VND</span>
+                        <button type="button" class="fx-btn" id="convFetch">
+                            <i class="bi bi-arrow-repeat"></i><span>Today's rate</span>
+                        </button>
+                    </div>
+                    <div class="fx-line" id="convFx" hidden></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>The rate is always written one way round, the way a board writes it. The arrows below decide which way you are changing.</p>
+
+                    <div class="seg is-wrap" id="convDir" data-value="out" style="margin-top:16px">
+                        <button type="button" data-val="out" class="is-on">I have base &rarr; I get other</button>
+                        <button type="button" data-val="in">I have other &rarr; I get base</button>
+                    </div>
+
+                    <div class="field" style="margin-top:18px">
+                        <label for="convAmount">I have <span class="per" id="convAmountCur"></span></label>
+                        <div class="money-input is-bare">
+                            <input type="number" id="convAmount" min="0" step="any" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="result">
+                        <span class="lbl">I get</span>
+                        <span class="val" id="convResult">&mdash;</span>
+                        <span class="sub" id="convBack">&mdash;</span>
+                    </div>
+
+                    <div class="form-foot is-quiet">
+                        <button type="button" class="ghost-btn" id="convSaveRate">
+                            <i class="bi bi-pin-angle"></i>Use this rate for the trip
+                        </button>
+                        <p class="hint" id="convSaveHint"></p>
+                    </div>
+
+                    <div class="card-head" style="margin-top:26px">
+                        <h2>At a glance</h2>
+                        <span class="card-note" id="convLadderNote"></span>
+                    </div>
+                    <div class="table-wrap"><table class="ladder" id="convLadder"></table></div>
+
                 </section>
 
             </div>
@@ -486,6 +1521,8 @@
 
 <!-- Import throws away what is here, and deleting a trip takes its stops,
      bookings and list with it. Both are worth a sentence and a second click. -->
+<div class="toast-wrap" id="toastWrap"></div>
+
 <div class="dialog" id="askBox" hidden>
     <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="askTitle">
         <h2 id="askTitle">Are you sure?</h2>
@@ -497,6 +1534,9 @@
     </div>
 </div>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="gcal-config.js"></script>
 <script src="app.js"></script>
+<script src="gcal.js"></script>
 </body>
 </html>

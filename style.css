@@ -87,7 +87,11 @@
     --sky-soft:    #dff2f9;
     --violet:      #6c46bd;   /* stays */
     --violet-soft: #efe9fb;
-    --amber:       #a97612;   /* food */
+    /* Darkened from #a97612, which was 3.5:1 as a word on its own tint —
+       the one semantic colour in the set that could not carry its own tag.
+       Green and red already cleared 4.5:1; this brings amber into line, and
+       it fixes every place amber is a word at once. */
+    --amber:       #8f630e;   /* food */
     --amber-soft:  #fbf1da;
     --teal:        #0f7d78;   /* activities */
     --teal-soft:   #dff0ef;
@@ -315,6 +319,9 @@ h1, h2, h3, .brand-name, .hero-value {
 
 /* The gap above the first module belongs to the nav, which is always there,
    not to the tagline, which comes and goes with the width. */
+.tab-rule { height: 1px; margin: 8px 12px; background: var(--line); }
+.app.is-rail .tab-rule { margin: 8px 10px; }
+
 .tabs { display: flex; flex-direction: column; gap: 3px; margin-top: 22px; }
 
 /* Full-width rows, so the target is the column rather than the word — and so
@@ -985,6 +992,7 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .data-table .is-minus  { color: var(--red); }
 .data-table .is-plus   { color: var(--green); }
 .data-table .is-muted  { color: var(--ink-4); }
+.data-table strong.is-gone { color: var(--ink-4); font-style: italic; font-weight: 550; }
 .data-table .dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
 
 /* The trip currently open in the top bar, so the switch and the list are
@@ -1025,6 +1033,8 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .tag.is-amber { background: var(--amber-soft); color: var(--amber); }
 .tag.is-red   { background: var(--red-soft);   color: var(--red); }
 .tag.is-node  { background: var(--node-soft);  color: var(--node); }
+.tag.is-violet { background: var(--violet-soft); color: var(--violet); }
+.tag.is-muted  { background: var(--line-2); color: var(--ink-4); }
 .tag.is-solid { background: var(--azure); color: var(--on-azure); }
 
 /* ==========================================================================
@@ -1206,7 +1216,7 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .stop {
     position: relative;
     display: grid;
-    grid-template-columns: 58px 36px minmax(0, 1fr) auto auto;
+    grid-template-columns: 76px 36px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 12px;
     padding: 9px 0;
@@ -1229,16 +1239,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 }
 
 .stop.is-now::before { background: var(--node); }
-
-.stop-time {
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.stop-time.is-none { color: var(--ink-4); font-weight: 500; }
 
 .stop-body { min-width: 0; }
 .stop-title { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
@@ -1549,3 +1549,2203 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 @media (prefers-reduced-motion: reduce) {
     * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* ==========================================================================
+   MODULE 02 — CALENDAR & TIMELINE
+
+   The one screen that answers "what have I got on" without asking which
+   module to look in. Four views over the same set of items, and the items
+   come from four places: activities the calendar owns, trips (as bars
+   spanning their dates), itinerary stops (the "what time, where" of a trip)
+   and bookings. Only the first is editable here; the rest are windows into
+   the module that owns them, and clicking one goes there.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Category colour.
+
+   One class per category sets a pair of custom properties, and every chip,
+   dot, disc and block below is written against `--cc` / `--cc-soft` rather
+   than against a category name. Adding a seventh category is one line here
+   and nothing anywhere else.
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   The bar: where you are, and how you are looking at it
+   -------------------------------------------------------------------------- */
+.cal-nav { display: flex; align-items: center; gap: 6px; }
+.cal-nav .ghost-btn { padding: 7px 10px; }
+.cal-nav .ghost-btn i { font-size: 13px; }
+
+.cal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cal-search { position: relative; display: flex; align-items: center; flex: 1 1 220px; min-width: 0; }
+.cal-search i { position: absolute; left: 13px; font-size: 13px; color: var(--ink-3); pointer-events: none; }
+/* The search field and the country picker sit side by side, and an input and
+   a select do not agree on their own height from the same padding — 3px
+   apart, which reads as sloppy rather than as a difference. Both are given an
+   explicit height with no vertical padding, so the browser centres the text
+   and the two boxes line up exactly. */
+.cal-search input, .cal-pick select { height: 40px; padding-top: 0; padding-bottom: 0; }
+.cal-search input { padding-left: 34px; padding-right: 12px; font-size: 13.5px; }
+
+/* A category is on or off, and the chip says which by filling with its own
+   colour rather than by a tick — the colour is the thing being toggled. */
+.cal-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.cat-chip .dot { width: 8px; height: 8px; background: var(--cc); opacity: .45; }
+.cat-chip:hover { color: var(--ink-2); border-color: var(--line-strong); }
+.cat-chip.is-on { background: var(--cc-soft); border-color: var(--cc); color: var(--ink); }
+.cat-chip.is-on .dot { opacity: 1; }
+.cat-chip .n { font-variant-numeric: tabular-nums; opacity: .75; }
+
+/* ==========================================================================
+   Month
+   ========================================================================== */
+.cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+
+.cal-dow {
+    padding: 9px 10px;
+    background: var(--paper-2);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    text-align: center;
+}
+
+.cal-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 112px;
+    padding: 7px 7px 8px;
+    background: var(--paper);
+    transition: background .14s ease;
+}
+
+.cal-cell.is-out { background: var(--paper-2); }
+.cal-cell.is-drop { background: var(--azure-soft); box-shadow: inset 0 0 0 2px var(--azure); }
+
+.cal-daynum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The tinted cell already says "another month". Dimming the number as well
+   pushed it under 4.5:1 for a date people still read and click. */
+.cal-cell.is-out .cal-daynum { color: var(--ink-2); }
+.cal-cell.is-today .cal-daynum { background: var(--azure); color: var(--on-azure); }
+
+/* An item in a month cell. It has room for a time and a name and nothing
+   else, so the category is carried by the bar down its left edge. */
+.cal-chip {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    width: 100%;
+    padding: 3px 6px 3px 7px;
+    border: 0;
+    border-left: 3px solid var(--cc);
+    border-radius: 4px;
+    background: var(--cc-soft);
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    transition: filter .14s ease;
+}
+
+.cal-chip:hover { filter: brightness(.96); }
+:root[data-theme="dark"] .cal-chip:hover { filter: brightness(1.25); }
+.cal-chip .t { flex: 0 0 auto; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: 10px; }
+.cal-chip .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-chip[draggable="true"] { cursor: grab; }
+.cal-chip.is-dragging { opacity: .4; }
+
+/* A trip runs across days, so it reads as a bar rather than a chip: square
+   ends in the middle of the run, round ones where it actually starts and
+   stops. Without that a five-day trip looks like five separate things. */
+.cal-chip.is-span { background: var(--cc); color: var(--on-azure); border-left: 0; border-radius: 0; padding-left: 8px; }
+.cal-chip.is-span .t { color: rgba(255, 255, 255, .8); }
+.cal-chip.is-span.is-start { border-radius: 4px 0 0 4px; }
+.cal-chip.is-span.is-end { border-radius: 0 4px 4px 0; }
+.cal-chip.is-span.is-mid .n { opacity: 0; }
+
+.cal-more {
+    align-self: flex-start;
+    padding: 2px 5px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    font: inherit;
+    font-size: 10.5px;
+    font-weight: 650;
+    color: var(--ink-3);
+    cursor: pointer;
+}
+
+.cal-more:hover { background: var(--canvas); color: var(--ink-2); }
+
+/* ==========================================================================
+   Week and Day — the same time grid, one column or seven
+   ========================================================================== */
+.cal-grid-wrap { overflow-x: auto; }
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: 56px repeat(var(--cols, 7), minmax(94px, 1fr));
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    min-width: 100%;
+}
+
+.cal-corner, .cal-head {
+    padding: 8px 10px;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--line);
+    text-align: center;
+}
+
+.cal-head { border-left: 1px solid var(--line-2); }
+.cal-head .d { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2); }
+.cal-head .n { font-size: 15px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cal-head.is-today .n { color: var(--azure-ink); }
+
+/* Anything without a time — a trip bar, a birthday — belongs above the grid,
+   not floating at midnight inside it. */
+.cal-allday-label, .cal-allday {
+    padding: 6px 8px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    min-height: 34px;
+}
+
+.cal-allday { border-left: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 3px; }
+
+.cal-allday-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    text-align: right;
+}
+
+.cal-hours { background: var(--paper); }
+
+.cal-hour {
+    height: var(--hour, 42px);
+    padding: 0 9px;
+    border-bottom: 1px solid var(--line-2);
+    font-size: 10.5px;
+    color: var(--ink-3);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    transform: translateY(-6px);
+}
+
+.cal-col { position: relative; background: var(--paper); border-left: 1px solid var(--line-2); }
+.cal-col.is-today { background: var(--azure-soft); }
+.cal-col.is-drop { box-shadow: inset 0 0 0 2px var(--azure); }
+
+/* The line for the current moment, drawn only on the column that is today. */
+.cal-now { position: absolute; left: 0; right: 0; height: 2px; background: var(--node); z-index: 3; pointer-events: none; }
+.cal-now::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--node); }
+
+.cal-block {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 6px 4px 7px;
+    border: 0;
+    border-left: 3px solid var(--cc);
+    border-radius: 5px;
+    background: var(--cc-soft);
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.cal-block:hover { filter: brightness(.96); z-index: 4; }
+:root[data-theme="dark"] .cal-block:hover { filter: brightness(1.25); }
+.cal-block .t { font-size: 10px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cal-block .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.cal-block .w { font-size: 10px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-block.is-short { flex-direction: row; align-items: baseline; gap: 5px; padding-top: 2px; padding-bottom: 2px; }
+.cal-block.is-short .w { display: none; }
+.cal-block[draggable="true"] { cursor: grab; }
+.cal-block.is-dragging { opacity: .4; }
+
+/* ==========================================================================
+   Timeline — everything ahead, in the order it happens
+   ========================================================================== */
+.cal-tl-day + .cal-tl-day { margin-top: 22px; }
+
+.cal-tl-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line-2);
+}
+
+.cal-tl-head .w { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--azure-ink); }
+.cal-tl-head .d { font-size: 14.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.cal-tl-head .c { margin-left: auto; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cal-tl-day.is-today .cal-tl-head .w { color: var(--node); }
+.cal-tl-day.is-today .cal-tl-head { border-bottom-color: var(--node); }
+
+.cal-row {
+    display: grid;
+    grid-template-columns: 64px 36px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 9px 2px;
+    border: 0;
+    border-top: 1px solid var(--row-line);
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cal-row:first-child { border-top: 0; }
+.cal-row:hover { background: var(--paper-2); }
+.cal-row .tm { font-size: 12.5px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-row .tm.is-none { color: var(--ink-3); font-weight: 500; }
+.cal-row .nm { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.cal-row .wh { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; overflow-wrap: anywhere; }
+.cal-row .src { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
+
+/* The disc, tinted by category rather than by trip kind. */
+.disc.cat { background: var(--cc-soft); color: var(--cc); }
+
+.cal-bell { font-size: 11px; color: var(--node); }
+
+/* ==========================================================================
+   Calendar responsive
+   ========================================================================== */
+@media (max-width: 900px) {
+    .cal-title { font-size: 15px; }
+    .cal-cell { min-height: 74px; padding: 5px 4px 6px; }
+    .cal-dow { padding: 7px 2px; font-size: 9px; letter-spacing: .04em; }
+    .cal-daynum { min-width: 20px; height: 20px; font-size: 11px; }
+
+    /* A month cell on a phone is 44px wide. A name will not fit in it, and a
+       truncated name is worse than none — the chip becomes a coloured bar
+       that says "something is on this day", and the day view says what. */
+    .cal-chip { padding: 3px 4px; font-size: 10px; }
+    .cal-chip .t, .cal-chip .n { display: none; }
+    .cal-chip { height: 6px; border-radius: 3px; background: var(--cc); border-left: 0; }
+    .cal-chip.is-span .n { display: none; }
+
+    .cal-grid { grid-template-columns: 44px repeat(var(--cols, 7), minmax(78px, 1fr)); }
+    .cal-hour { padding: 0 5px; font-size: 9.5px; }
+
+    .cal-row { grid-template-columns: 56px 30px minmax(0, 1fr) auto; gap: 8px 10px; }
+    .cal-row .disc { width: 30px; height: 30px; border-radius: 10px; font-size: 13px; }
+    .cal-row .src { display: none; }
+}
+
+@media (max-width: 560px) {
+    .cal-search { flex: 1 1 100%; }
+    .cal-cats { width: 100%; }
+    .cat-chip { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ==========================================================================
+   CONVERT
+
+   A money changer's calculator and nothing more. It holds no balances, keeps
+   no history and fetches no live rates: you type the rate off the board in
+   front of you, because that is the rate you are actually getting, not the
+   mid-market one an API would tell you about.
+   ========================================================================== */
+
+/* A currency, as a control. The flag is the fastest thing to find in a list
+   of ten, the code is the thing that is unambiguous, and the name is there
+   for anyone who does not know that KRW is won. */
+.cur-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: end; }
+
+.swap-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 1px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--paper);
+    font-size: 14px;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.swap-btn:hover { border-color: var(--azure); background: var(--azure-soft); color: var(--azure-ink); }
+.swap-btn:active { transform: rotate(180deg); }
+
+/* The rate, written the way a board writes it: one unit of the base, then
+   however many of the other. The number is the only editable part, so it is
+   the only part that looks editable. */
+.rate-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border: 1px solid var(--azure-line);
+    border-radius: var(--radius-sm);
+    background: var(--azure-soft);
+}
+
+.rate-line .fixed {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--azure-ink);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.rate-line input {
+    width: auto;
+    flex: 1 1 130px;
+    min-width: 110px;
+    padding: 9px 12px;
+    background: var(--paper);
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The answer. It is the reason the screen exists, so it is the biggest
+   thing on it and it is never more than one line. */
+.result {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 18px;
+    padding: 22px 24px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(128deg, var(--hero-a), var(--hero-b));
+    color: #fff;
+}
+
+.result .lbl {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .84);
+}
+
+.result .val {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(1.9rem, 6vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.result .sub { font-size: 12.5px; color: rgba(255, 255, 255, .9); font-variant-numeric: tabular-nums; }
+
+/* The counter test: you are holding a 500 note and you want to know what it
+   is worth without typing anything. */
+.ladder { width: 100%; border-collapse: collapse; }
+.ladder th { padding: 0 12px 9px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); text-align: right; border-bottom: 1px solid var(--line-2); }
+.ladder th:first-child { text-align: left; }
+.ladder td { padding: 9px 12px; font-size: 13.5px; text-align: right; border-bottom: 1px solid var(--row-line); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ladder td:first-child { text-align: left; font-weight: 650; color: var(--ink); }
+.ladder tr:last-child td { border-bottom: 0; }
+
+/* --------------------------------------------------------------------------
+   Money changer: the same sum twice, at the two rates on the board
+
+   Side by side on purpose. A buy rate and a sell rate mean nothing apart and
+   everything together — the gap between them is what the trip costs you for
+   changing your mind.
+   -------------------------------------------------------------------------- */
+.changer { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 16px; }
+
+.changer-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.changer-panel h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+/* The icon carries the colour, the words carry the meaning. Sell orange as
+   text was 2.7:1 on this panel — an accent is a shape colour, not an ink. */
+.changer-panel h3 { color: var(--ink); }
+.changer-panel h3 i { font-size: 13px; }
+.changer-panel.is-buy h3 i { color: var(--green); }
+.changer-panel.is-sell h3 i { color: var(--node); }
+
+.changer-out {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+
+.changer-out .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.changer-out .val { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* ==========================================================================
+   MODULE 03 · Trip & Event Management
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Create New
+
+   Three kinds behind one button. The alternative was three buttons in the
+   bar, which reads as three unrelated actions and takes the width the
+   filter needs — and the choice is made once, at the start, so it does not
+   have to be permanently on screen.
+   -------------------------------------------------------------------------- */
+.new-wrap { position: relative; }
+
+.new-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-width: 292px;
+    padding: 6px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+
+.new-menu button {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 12px;
+    padding: 10px 12px;
+    background: none;
+    border: 0;
+    border-radius: 10px;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.new-menu button:hover,
+.new-menu button:focus-visible { background: var(--azure-soft); }
+
+.new-menu .mk { grid-row: 1 / 3; font-size: 22px; line-height: 1; text-align: center; }
+.new-menu b { font-size: 14px; font-weight: 650; color: var(--ink); }
+.new-menu small { font-size: 11.5px; line-height: 1.35; color: var(--ink-3); }
+
+/* --------------------------------------------------------------------------
+   The shelf
+
+   A card rather than a table row. Every field a trip carries is a different
+   shape — a picture, a name, two dates, four figures — and a table asks all
+   four to be a cell of the same width. The cover answers "which one is
+   this" before the words are read, which is what the row was for.
+   -------------------------------------------------------------------------- */
+.trip-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+    gap: 18px;
+}
+
+.trip-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .14s, box-shadow .14s, transform .14s;
+}
+
+.trip-card:hover,
+.trip-card:focus-visible {
+    border-color: var(--azure);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+}
+
+/* The one you are in. It is stated on the card rather than only in the
+   switch, because this is the screen where you change your mind. */
+.trip-card.is-current { border-color: var(--azure); box-shadow: 0 0 0 1px var(--azure); }
+
+.tc-cover {
+    position: relative;
+    height: 132px;
+    background-color: var(--azure-soft);
+    background-size: cover;
+    background-position: center;
+}
+
+.tc-cover.is-bare {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* No photo is a state, not a gap: the mark of what it is, set large and
+   quiet, so a shelf of coverless records still reads as a shelf. */
+.tc-cover.is-bare > i { font-size: 34px; color: var(--azure); opacity: .38; }
+
+.tc-kind,
+.tc-status {
+    position: absolute;
+    top: 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tc-kind {
+    left: 10px;
+    padding: 3px 9px;
+    border-radius: 7px;
+    background: var(--paper);
+    color: var(--ink-2);
+    box-shadow: 0 1px 3px rgba(15, 41, 77, .16);
+}
+
+.tc-status { right: 10px; box-shadow: 0 1px 3px rgba(15, 41, 77, .16); }
+
+.tc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 auto;
+    padding: 16px 18px 4px;
+    min-width: 0;
+}
+
+.tc-body h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.tc-type {
+    margin: -6px 0 0;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--azure-ink);
+}
+
+.tc-desc {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Dates under each other rather than side by side. A trip is a departure
+   and a return, and the arrow between them says which is which without
+   asking anybody to work out which end of a dash they are reading. */
+.tc-when {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.tc-when b {
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.tc-when > i { font-size: 11px; color: var(--ink-4); }
+.tc-when .is-idle { font-size: 12.5px; color: var(--ink-4); }
+
+.tc-clock {
+    margin-left: auto;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--azure-ink);
+    white-space: nowrap;
+}
+
+.tc-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 14px;
+    margin: 2px 0 0;
+}
+
+.tc-facts dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.tc-facts dt > i { font-size: 11px; color: var(--ink-4); }
+
+.tc-facts dd {
+    margin: 3px 0 0;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+/* Committed past the budget. The figure is still the figure — it is the
+   colour that changes, not the number. */
+.tc-facts .is-over { color: var(--red); }
+
+.tc-foot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: auto;
+    padding: 12px 14px 12px 18px;
+}
+
+.tc-open {
+    margin-right: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--azure-ink);
+}
+
+.trip-card.is-current .tc-open { color: var(--ink-3); }
+
+/* --------------------------------------------------------------------------
+   The cover picker
+   -------------------------------------------------------------------------- */
+.cover-pick { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.cover-shot {
+    width: 168px;
+    height: 96px;
+    flex: 0 0 auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background-size: cover;
+    background-position: center;
+}
+
+.cover-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.cover-note { font-size: 11.5px; line-height: 1.45; color: var(--ink-3); max-width: 34ch; }
+
+/* --------------------------------------------------------------------------
+   The type lists
+
+   Two lists, not one with a column saying which it belongs to: the words do
+   not carry over — a Wedding trip and a Camping event are both nonsense —
+   so the split is the point rather than a filter over a single table.
+   -------------------------------------------------------------------------- */
+.type-set + .type-set { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line-2); }
+
+.type-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.type-head h3 { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+
+.type-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 4px 20px; }
+
+.type-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 30px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+}
+
+.type-name { padding: 7px 11px; font-size: 13px; font-weight: 600; }
+.type-use { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.type-use.is-idle { color: var(--ink-4); }
+.type-none { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-4); }
+
+/* A button sized to sit beside a select without taking half the pair. */
+.ghost-btn.is-narrow { flex: 0 0 auto; white-space: nowrap; }
+
+@media (max-width: 620px) {
+    .new-menu { min-width: min(292px, calc(100vw - 64px)); }
+    .tc-facts { grid-template-columns: minmax(0, 1fr); }
+    .cover-shot { width: 100%; height: 132px; }
+}
+
+/* ==========================================================================
+   MODULE 04 · Schedule & Itinerary — the extra a stop carries
+
+   The skeleton is unchanged: a clock, a disc, a body, a figure, two
+   buttons. What grew is the two ends — the clock now holds a start, an end
+   and how long that is, and the figure holds an estimate, an actual and the
+   gap between them. Everything else stacks inside the body it already had.
+   ========================================================================== */
+.stop-clock { display: flex; flex-direction: column; gap: 1px; }
+
+.stop-clock b {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stop-clock b.is-none { color: var(--ink-4); font-weight: 500; }
+
+.stop-clock small {
+    font-size: 11px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* How long it runs, which is the one number here nobody typed. */
+.stop-clock .is-run { color: var(--ink-4); font-weight: 600; }
+
+.stop-desc {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    overflow-wrap: anywhere;
+}
+
+.stop-where > i { margin-right: 5px; color: var(--ink-4); }
+
+/* The row of small facts under a stop: its status, whether it has a note,
+   what is attached, which expense record the actual came from. */
+.stop-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+.stop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 24ch;
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: none;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stop-chip > i { flex: 0 0 auto; font-size: 11px; color: var(--ink-4); }
+
+.stop-chip.is-link { cursor: pointer; font: inherit; font-size: 10.5px; font-weight: 600; }
+.stop-chip.is-link:hover { border-color: var(--azure); color: var(--azure-ink); }
+.stop-chip.is-link:hover > i { color: var(--azure-ink); }
+
+/* --------------------------------------------------------------------------
+   Estimated, actual, and the gap
+
+   Three figures in a column and only the first is always there. The gap is
+   the one worth colouring, because it is the only one that is a judgement:
+   over is worth noticing, under is worth nothing but a nod.
+   -------------------------------------------------------------------------- */
+.stop-money { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+
+.stop-actual {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stop-diff {
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stop-diff.is-over  { color: var(--red); }
+.stop-diff.is-under { color: var(--green); }
+.stop-diff.is-level { color: var(--ink-4); }
+
+.day-act { color: var(--ink-4); }
+
+/* Cancelled and skipped. Still legible, because it is still information —
+   dimmed rather than struck through, so a long title stays readable. */
+.stop.is-off { opacity: .55; }
+.stop.is-off .stop-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+.stop.is-off::before { background: var(--line-strong); }
+
+/* --------------------------------------------------------------------------
+   The attachment
+   -------------------------------------------------------------------------- */
+.att-pick { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.att-held {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 92px;
+    height: 68px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.att-held img { width: 100%; height: 100%; object-fit: cover; }
+.att-held > i { font-size: 26px; color: var(--ink-4); }
+
+.att-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.att-note { font-size: 11.5px; line-height: 1.45; color: var(--ink-3); max-width: 42ch; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+    .stop { grid-template-columns: 76px 30px minmax(0, 1fr); grid-template-areas: "clock disc body" ".    .    money" ".    .    acts"; }
+    .stop-clock { grid-area: clock; }
+    .stop > .disc { grid-area: disc; }
+    .stop-body  { grid-area: body; }
+    .stop-money { grid-area: money; align-items: flex-start; text-align: left; }
+    .stop-acts  { grid-area: acts; }
+}
+
+/* ==========================================================================
+   Notes & information
+
+   Cards rather than rows: a note is a paragraph and a list and a couple of
+   pictures, which is a shape a table cell cannot hold. The type is carried
+   by the strip down the left and the dot in the header — never by the text,
+   because nine hues put through a contrast test is nine chances to fail it.
+   ========================================================================== */
+.note-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.note-card {
+    position: relative;
+    padding: 16px 18px 18px 20px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--cc);
+    border-radius: 14px;
+    background: var(--paper);
+    min-width: 0;
+}
+
+/* Where a day in the plan lands you. It fades on its own, so nothing is
+   left highlighted after the eye has found it. */
+.note-card.is-lit {
+    animation: note-lit 1.8s ease-out;
+}
+
+@keyframes note-lit {
+    0%   { box-shadow: 0 0 0 3px var(--cc-soft); border-color: var(--cc); }
+    100% { box-shadow: 0 0 0 3px transparent; border-color: var(--line); }
+}
+
+.nc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+
+.nc-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 7px;
+    background: var(--cc-soft);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.nc-when { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nc-acts { display: inline-flex; gap: 2px; margin-left: auto; }
+
+.note-card h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.nc-body { font-size: 13px; line-height: 1.6; color: var(--ink-2); overflow-wrap: anywhere; }
+.nc-body p { margin: 0 0 6px; }
+.nc-body ul { margin: 0 0 8px; padding-left: 18px; }
+.nc-body li { margin-bottom: 3px; }
+.nc-body li::marker { color: var(--cc); }
+.nc-body > :last-child { margin-bottom: 0; }
+
+.nc-links { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+
+.nc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--azure-ink);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.nc-link > i { flex: 0 0 auto; font-size: 11px; opacity: .7; }
+.nc-link:hover { text-decoration: underline; }
+
+.nc-atts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* An image is worth showing, a document is worth naming — so one is a
+   thumbnail and the other is the chip a stop's attachment already uses. */
+.nc-shot {
+    width: 62px;
+    height: 48px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--paper-2);
+    cursor: pointer;
+}
+
+.nc-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nc-shot:hover { border-color: var(--azure); }
+
+/* --------------------------------------------------------------------------
+   The form's shelf of files
+   -------------------------------------------------------------------------- */
+.att-pick.is-stack { flex-direction: column; align-items: flex-start; gap: 12px; }
+.att-shelf { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.att-held.is-sm {
+    position: relative;
+    flex-direction: column;
+    width: 84px;
+    height: auto;
+    padding-bottom: 4px;
+    overflow: visible;
+}
+
+.att-held.is-sm img,
+.att-held.is-sm > i {
+    width: 100%;
+    height: 56px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.att-held.is-sm > i { display: flex; align-items: center; justify-content: center; font-size: 22px; }
+
+.att-name {
+    display: block;
+    width: 100%;
+    padding: 3px 5px 0;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--ink-3);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.att-x {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--paper);
+    color: var(--ink-3);
+    font-size: 9px;
+    cursor: pointer;
+}
+
+.att-x:hover { border-color: var(--red); color: var(--red); }
+
+/* --------------------------------------------------------------------------
+   The pin in a day heading
+
+   The join between the two halves of this screen: a note tied to Tuesday is
+   stated on Tuesday, where the day is actually read, and goes to the note.
+   -------------------------------------------------------------------------- */
+.day-pins { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 10px; }
+
+.day-pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 34ch;
+    padding: 3px 10px;
+    border: 1px solid var(--cc);
+    border-radius: 999px;
+    background: var(--cc-soft);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-pin .dot { flex: 0 0 auto; width: 7px; height: 7px; background: var(--cc); }
+.day-pin:hover { color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   The note form, folded into the card it belongs to
+   -------------------------------------------------------------------------- */
+.note-form {
+    margin-bottom: 22px;
+    padding: 18px 20px 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.note-form .field label code {
+    font-family: inherit;
+    font-size: 11px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--line-2);
+}
+
+@media (max-width: 620px) {
+    .note-deck { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   MODULE 05 · Expense Manager
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Where it went — four figures and a set of bars
+
+   The bars are drawn against the biggest category rather than against the
+   total, because at ten categories a share-of-total bar is nine slivers and
+   one stripe. Against the biggest, the shape of the spending is readable,
+   and the percentage of the total is stated beside it in words.
+   -------------------------------------------------------------------------- */
+.spend-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.spend-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+    min-width: 0;
+}
+
+.sf-label { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.sf-value { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sf-foot { font-size: 11.5px; line-height: 1.35; color: var(--ink-3); }
+
+.spend-bars { display: flex; flex-direction: column; gap: 9px; }
+
+.spend-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto 42px;
+    align-items: center;
+    gap: 12px;
+}
+
+.sb-name { font-size: 12.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-track { height: 9px; border-radius: 999px; background: var(--cc-soft); overflow: hidden; }
+.sb-fill { display: block; height: 100%; border-radius: 999px; background: var(--cc); }
+.sb-val { font-size: 12.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sb-pct { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* --------------------------------------------------------------------------
+   An expense
+
+   A card, because the split is a list and a list is not a table cell. The
+   category is carried by the strip and the chip; the amount is the one thing
+   set large, because it is what you came to the row to read.
+   -------------------------------------------------------------------------- */
+.spend-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(292px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.spend-card {
+    padding: 15px 18px 17px 20px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--cc);
+    border-radius: 14px;
+    background: var(--paper);
+    min-width: 0;
+}
+
+.sc-top { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+
+.sc-cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 7px;
+    background: var(--cc-soft);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.sc-ref { font-size: 10.5px; font-weight: 600; color: var(--ink-4); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+.spend-card h3 {
+    margin: 0 0 2px;
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.sc-desc { margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; color: var(--ink-3); overflow-wrap: anywhere; }
+.sc-amount { margin: 8px 0 12px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+.sc-amount .amt { align-items: flex-start; }
+
+.sc-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 0 0 12px; }
+
+.sc-facts dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.sc-facts dt > i { font-size: 10px; color: var(--ink-4); }
+.sc-facts dd { margin: 2px 0 0; font-size: 12.5px; font-weight: 600; color: var(--ink-2); overflow-wrap: anywhere; }
+
+.sc-split { padding-top: 11px; border-top: 1px solid var(--line-2); }
+
+.sc-split-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.sc-split-head b { color: var(--ink-2); }
+
+.sc-person-name { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-person-cut { margin-left: auto; font-size: 12.5px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.sc-nosplit { margin: 11px 0 0; padding-top: 11px; border-top: 1px solid var(--line-2); font-size: 12px; color: var(--ink-4); }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+/* --------------------------------------------------------------------------
+   People — a disc of initials, which is enough to tell four names apart
+   -------------------------------------------------------------------------- */
+.person-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--azure-soft);
+    color: var(--azure-ink);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.person-mark.is-sm { width: 22px; height: 22px; font-size: 9.5px; }
+
+
+/* --------------------------------------------------------------------------
+   Participants and the split
+
+   Ticking people is a row of toggles rather than a multi-select, because a
+   multi-select of four names is a control nobody can use on a phone.
+   -------------------------------------------------------------------------- */
+.who-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.who-none { margin: 0; font-size: 12.5px; color: var(--ink-4); }
+
+.who-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 13px 5px 5px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.who-chip .person-mark { background: var(--line-2); color: var(--ink-3); }
+.who-chip:hover { border-color: var(--line-strong); color: var(--ink-2); }
+.who-chip.is-on { border-color: var(--azure); background: var(--azure-soft); color: var(--ink); }
+.who-chip.is-on .person-mark { background: var(--azure); color: var(--on-azure); }
+
+.split-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 20px; margin-top: 14px; }
+.split-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 108px; align-items: center; gap: 10px; }
+.split-name { font-size: 12.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A split that does not add up is not a warning to be dismissed, it is the
+   reason Save will not go through — so the hint says so in the colour that
+   means it everywhere else. */
+.hint.is-wrong { color: var(--red); }
+.hint.is-wrong > i { color: var(--red); }
+
+@media (max-width: 620px) {
+    .spend-deck { grid-template-columns: minmax(0, 1fr); }
+    .spend-bar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name val" "track track" ".    pct"; gap: 5px 12px; }
+    .sb-name  { grid-area: name; }
+    .sb-track { grid-area: track; }
+    .sb-val   { grid-area: val; text-align: right; }
+    .sb-pct   { grid-area: pct; }
+    .sc-facts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   Receipt & document scanner
+
+   The stage is the picture and the buttons beside it, and it holds its
+   height whether it is showing a camera, a photograph or nothing — a card
+   that grows by 300px the moment somebody presses a button is a card that
+   throws the rest of the page down the screen.
+   ========================================================================== */
+.scan-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px); gap: 20px; align-items: start; }
+
+.scan-shot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 268px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.scan-shot video,
+.scan-shot img { max-width: 100%; max-height: 420px; display: block; }
+.scan-shot video { width: 100%; object-fit: cover; }
+
+.scan-blank { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px; text-align: center; }
+.scan-blank > i { font-size: 34px; color: var(--azure); opacity: .38; }
+.scan-blank p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); max-width: 30ch; }
+
+.scan-side { display: flex; flex-direction: column; gap: 12px; }
+.scan-acts { display: flex; flex-direction: column; gap: 8px; }
+.scan-acts > button { justify-content: center; }
+
+.scan-progress { display: flex; flex-direction: column; gap: 6px; }
+.sp-track { height: 6px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.sp-fill { display: block; height: 100%; border-radius: 999px; background: var(--azure); transition: width .3s ease; }
+.sp-say { font-size: 11.5px; color: var(--ink-3); }
+
+/* What the reader actually saw, folded away. It is the first thing worth
+   looking at when a guess is wrong and the last thing worth showing when
+   it is right. */
+.scan-raw { margin-top: 16px; }
+
+.scan-raw summary {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-3);
+    cursor: pointer;
+    padding: 6px 0;
+}
+
+.scan-raw summary:hover { color: var(--azure-ink); }
+
+.scan-raw pre {
+    margin: 8px 0 0;
+    padding: 14px 16px;
+    max-height: 260px;
+    overflow: auto;
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   The shelf of documents
+   -------------------------------------------------------------------------- */
+.doc-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+
+.doc-card {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--cc);
+    border-radius: 14px;
+    background: var(--paper);
+    min-width: 0;
+}
+
+.doc-shot {
+    width: 68px;
+    height: 76px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--cc-soft);
+    cursor: pointer;
+}
+
+.doc-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.doc-shot.is-bare { display: flex; align-items: center; justify-content: center; }
+.doc-shot.is-bare > i { font-size: 24px; color: var(--cc); }
+.doc-shot:hover { border-color: var(--azure); }
+
+.doc-body { min-width: 0; }
+
+.doc-kind {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.doc-card h3 { margin: 3px 0 2px; font-size: 14px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.doc-when { margin: 0; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.doc-note { margin: 5px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); overflow-wrap: anywhere; }
+.doc-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.doc-acts { display: flex; flex-direction: column; gap: 2px; }
+
+@media (max-width: 860px) {
+    .scan-stage { grid-template-columns: minmax(0, 1fr); }
+    .scan-acts { flex-direction: row; flex-wrap: wrap; }
+    .scan-acts > button { flex: 1 1 auto; }
+}
+
+@media (max-width: 620px) {
+    .doc-deck { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   People & participants
+   ========================================================================== */
+
+/* The headcount, for an event. A trip does not get one: on a trip
+   everybody is coming, and three figures saying so is furniture. */
+.head-count {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.hc-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 15px;
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+.hc-label { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.hc-cell b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hc-cell b.is-plus { color: var(--green); }
+.hc-cell b.is-minus { color: var(--red); }
+.hc-cell b.is-idle { color: var(--ink-4); }
+
+.people-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+
+.person-card {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper);
+    min-width: 0;
+}
+
+.person-mark.is-lg { width: 44px; height: 44px; font-size: 14px; }
+
+.pc-body { min-width: 0; }
+.pc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pc-top h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+
+.pc-role {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--azure-ink);
+}
+
+.pc-reach { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+
+.pc-reach a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-3);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.pc-reach a > i { flex: 0 0 auto; font-size: 11px; color: var(--ink-4); }
+.pc-reach a:hover { color: var(--azure-ink); text-decoration: underline; }
+.pc-reach a:hover > i { color: var(--azure-ink); }
+
+.pc-note { margin: 7px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); overflow-wrap: anywhere; }
+
+/* What this person is to the money, which is why the list is on this
+   screen at all. */
+.pc-money {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid var(--line-2);
+    font-size: 11.5px;
+    color: var(--ink-4);
+}
+
+.pc-money b { margin-left: auto; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pc-money b.is-plus { color: var(--green); }
+.pc-money b.is-minus { color: var(--red); }
+.pc-money b.is-square { color: var(--ink-4); font-weight: 600; }
+
+.pc-acts { display: flex; flex-direction: column; gap: 2px; }
+
+.person-form {
+    margin-bottom: 20px;
+    padding: 18px 20px 4px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper-2);
+}
+
+/* --------------------------------------------------------------------------
+   Ticked and not
+
+   Every name on the trip appears against every expense, because "John was
+   not on this one" and "John was left off this one" look identical when
+   the list only holds the people who were.
+   -------------------------------------------------------------------------- */
+.sc-person { display: grid; grid-template-columns: 22px minmax(0, 1fr) 16px auto; align-items: center; gap: 8px; padding: 3px 0; }
+.sc-tick { display: flex; justify-content: center; font-size: 11px; color: var(--green); }
+.sc-person.is-out { opacity: .5; }
+.sc-person.is-out .sc-tick { color: var(--ink-4); }
+.sc-person.is-out .person-mark { background: var(--line-2); color: var(--ink-4); }
+.sc-person.is-out .sc-person-cut { font-weight: 500; color: var(--ink-4); }
+
+@media (max-width: 620px) {
+    .people-deck { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   Split & settlement
+
+   A row per transfer, and the transfer itself is a sentence: name, arrow,
+   name, amount. Everything else on the card — what has been handed over,
+   the buttons — sits under it, because the sentence is what you came to
+   read and the rest is what you do about it.
+   ========================================================================== */
+.settle-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.settle-bar .sb-track { flex: 1 1 auto; height: 9px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.settle-bar .sb-fill { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width .3s ease; }
+.settle-left { font-size: 12px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.settle-deck { display: flex; flex-direction: column; gap: 10px; }
+
+.settle-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper);
+}
+
+.settle-card.is-off { opacity: .55; }
+
+.st-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.st-name { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.st-who > i { font-size: 13px; color: var(--ink-4); margin: 0 2px; }
+
+.st-figure { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
+.st-figure b { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.st-left { font-size: 11.5px; font-weight: 600; color: var(--amber); font-variant-numeric: tabular-nums; }
+
+.st-acts {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    border-top: 1px solid var(--line-2);
+}
+
+.st-paid { display: flex; flex-direction: column; gap: 5px; }
+.st-paid > span { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.st-paid .money-input { width: 150px; }
+.st-acts .ghost-btn { margin-left: 0; }
+.st-acts > .ghost-btn:first-of-type { margin-left: auto; }
+
+/* A percentage is a number with a sign after it, not a currency — so it
+   gets the same frame as a money field with the other unit in it. */
+.pct-input { position: relative; display: flex; align-items: center; }
+.pct-input input { width: 100%; padding-right: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.pct-input > span {
+    position: absolute;
+    right: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-3);
+    pointer-events: none;
+}
+
+@media (max-width: 620px) {
+    .settle-card { grid-template-columns: minmax(0, 1fr); }
+    .st-figure { align-items: flex-start; text-align: left; }
+    .st-acts > .ghost-btn:first-of-type { margin-left: 0; }
+    .st-paid .money-input { width: 100%; }
+    .st-paid { flex: 1 1 100%; }
+}
+
+/* ==========================================================================
+   Budget — what Summary & Analytics measures against
+   ========================================================================== */
+.budget-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+/* The one bar on the screen that is drawn against the budget rather than
+   against the biggest thing on it. A bar that rescales to whatever was
+   spent cannot show going over, which is the one thing this bar is for. */
+.budget-bar { display: flex; align-items: center; gap: 14px; }
+.bb-track { display: flex; flex: 1 1 auto; height: 12px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.bb-fill { display: block; height: 100%; background: var(--green); transition: width .3s ease; }
+.bb-over { display: block; height: 100%; background: var(--red); }
+
+.budget-bar.is-warn .bb-fill { background: var(--amber); }
+.budget-bar.is-over .bb-fill { background: var(--red); }
+
+.bb-pct { font-size: 13px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 46px; text-align: right; }
+.budget-bar.is-warn .bb-pct { color: var(--amber); }
+.budget-bar.is-over .bb-pct { color: var(--red); }
+
+/* What is not spent but is not nothing either. */
+.budget-aside {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line-2);
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.budget-aside span { display: inline-flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+.budget-aside i { font-size: 12px; color: var(--ink-4); }
+
+.budget-sub { font-size: 11.5px; line-height: 1.4; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------------------
+   Warnings
+   -------------------------------------------------------------------------- */
+.warn-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--amber-soft);
+}
+
+.warn-row + .warn-row { margin-top: 8px; }
+.warn-row > i { font-size: 16px; color: var(--amber); }
+.warn-row.is-over { background: var(--red-soft); }
+.warn-row.is-over > i { color: var(--red); }
+
+.warn-say { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.warn-say b { font-size: 13.5px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
+.warn-say span { font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.warn-pct { font-size: 17px; font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
+.warn-row.is-over .warn-pct { color: var(--red); }
+
+/* --------------------------------------------------------------------------
+   Category budgets — the row is where the budget is typed
+   -------------------------------------------------------------------------- */
+.cat-budgets { display: flex; flex-direction: column; }
+
+.cat-budget {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) 132px 100px 100px minmax(70px, .8fr);
+    align-items: center;
+    gap: 14px;
+    padding: 9px 0;
+}
+
+.cat-budget + .cat-budget { border-top: 1px solid var(--row-line); }
+
+.cb-name { font-size: 13px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-set input { text-align: right; }
+.cb-actual { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.cb-actual.is-idle { color: var(--ink-4); font-weight: 500; }
+.cb-left { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+.cb-left.is-minus { color: var(--red); font-weight: 700; }
+.cb-left.is-idle { color: var(--ink-4); }
+.cb-bar { height: 8px; }
+.cat-budget .bb-fill { background: var(--cc); }
+.cat-budget.is-warn .bb-fill { background: var(--amber); }
+.cat-budget.is-over .bb-fill { background: var(--red); }
+
+/* A line that is an estimate rather than money, in the one list that
+   holds both. */
+.data-table tr.is-soft td { color: var(--ink-3); }
+.data-table tr.is-soft .is-strong { font-weight: 600; color: var(--ink-2); }
+
+@media (max-width: 860px) {
+    .cat-budget {
+        grid-template-columns: minmax(0, 1fr) 120px;
+        grid-template-areas: "name  set" "actual left" "bar   bar";
+        gap: 6px 14px;
+        padding: 12px 0;
+    }
+    .cb-name   { grid-area: name; }
+    .cb-set    { grid-area: set; }
+    .cb-actual { grid-area: actual; text-align: left; }
+    .cb-left   { grid-area: left; }
+    .cb-bar    { grid-area: bar; }
+}
+
+/* ==========================================================================
+   Home Dashboard & Summary — figures, breakdowns and the quick reads
+   ========================================================================== */
+.dash-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   The breakdown
+
+   A stacked bar with a row per slice under it, rather than a legend. A
+   legend answers "which colour is which"; these rows answer "how much and
+   what share", which is the question somebody opened the card with.
+   -------------------------------------------------------------------------- */
+.break-rows { display: flex; flex-direction: column; margin-top: 16px; }
+
+.break-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto 46px;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+}
+
+.break-row + .break-row { border-top: 1px solid var(--row-line); }
+.break-row > .dot { width: 10px; height: 10px; background: var(--cc); }
+.br-name { font-size: 13px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.br-val { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.br-pct { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+.break-row.is-idle .br-name,
+.break-row.is-idle .br-val { color: var(--ink-4); font-weight: 500; }
+
+/* The by-person rows carry a bar as well, because a name has no colour of
+   its own and a share of the total is easier seen than read. */
+.break-row.is-wide-row { grid-template-columns: 22px minmax(0, 1fr) minmax(60px, 1.4fr) auto 46px; }
+.br-bar { height: 8px; }
+.break-row .bb-fill { background: var(--azure); }
+
+@media (max-width: 620px) {
+    .break-row.is-wide-row { grid-template-columns: 22px minmax(0, 1fr) auto 46px; }
+    .break-row.is-wide-row .br-bar { display: none; }
+}
+
+/* ==========================================================================
+   Money in a currency that is not the trip's own
+
+   The original is the fact. The conversion is a convenience, so it is set
+   smaller and underneath, and it never replaces what was actually paid.
+   ========================================================================== */
+.amt { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.amt .in { font-variant-numeric: tabular-nums; }
+.amt .as { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.amt .as.is-unknown { color: var(--amber); }
+
+/* A code riding beside a figure in a list, where a second line will not fit. */
+.cur-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--canvas);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    color: var(--ink-2);
+    vertical-align: 1px;
+}
+
+/* The rate table on the Budget screen: every foreign currency the trip
+   actually uses, and whether we know what it is worth. */
+.rate-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 170px auto;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 0;
+}
+
+.rate-row + .rate-row { border-top: 1px solid var(--row-line); }
+.rate-row .who { font-size: 14px; font-weight: 650; color: var(--ink); }
+.rate-row .who small { display: block; font-size: 11.5px; font-weight: 400; color: var(--ink-3); }
+.rate-row .eq { font-size: 12px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rate-row input { padding: 8px 11px; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.money-input.is-bare input { padding-left: 14px; }
+
+@media (max-width: 900px) {
+    .cur-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .swap-btn { justify-self: center; margin: 0; }
+    .rate-line { padding: 14px; }
+    .result { padding: 18px 18px; }
+    .rate-row { grid-template-columns: minmax(0, 1fr) 130px; gap: 8px 12px; }
+    .rate-row .eq { grid-column: 1 / -1; }
+}
+
+/* ==========================================================================
+   Today's reference rate
+
+   Fetched daily, cached, and never allowed to look like the rate you will
+   actually be given. A mid-market rate is the midpoint between what banks
+   buy and sell at; no counter on any high street trades there. It is here to
+   start you off and to tell you whether the board in front of you is fair.
+   ========================================================================== */
+.fx-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--azure-line);
+    border-radius: 9px;
+    background: var(--paper);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--azure-ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .16s ease;
+}
+
+.fx-btn:hover:not(:disabled) { background: var(--azure-soft); border-color: var(--azure); }
+.fx-btn:disabled { opacity: .55; cursor: default; }
+.fx-btn i { font-size: 12px; }
+.fx-btn.is-loading i { animation: fx-spin 0.9s linear infinite; }
+
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+
+.fx-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.fx-line .pip {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--track-2);
+    align-self: center;
+}
+
+.fx-line.is-live .pip { background: var(--green); }
+.fx-line.is-stale .pip { background: var(--amber); }
+.fx-line.is-fail .pip { background: var(--red); }
+.fx-line b { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.fx-line .caveat { color: var(--ink-3); }
+
+/* How the rate you typed compares with the middle of the market. Stated as a
+   fact rather than a verdict — a changer is allowed a margin, and only you
+   know whether this one has earned it. */
+.fx-gap {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 7px;
+    background: var(--canvas);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.fx-gap.is-under { background: var(--amber-soft); color: var(--amber); }
+.fx-gap.is-over  { background: var(--green-soft); color: var(--green); }
+
+@media (max-width: 620px) {
+    .rate-line { flex-wrap: wrap; }
+    .fx-btn { width: 100%; justify-content: center; }
+}
+
+/* ==========================================================================
+   Categories you own
+
+   The six that ship are a starting point, not a schema. A category is a row
+   in the store like anything else, so its name, its mark and its colour are
+   all editable and the list can grow.
+
+   Colour is the reason this needed rethinking: it used to be one CSS class
+   per category, which caps the list at however many classes were written.
+   Now `--cc` / `--cc-soft` are set inline from a small palette of tokens,
+   so every chip, dot, disc and block downstream keeps working and the count
+   stops mattering.
+   ========================================================================== */
+.cal-chip, .cal-block, .cal-row, .cat-chip, .disc.cat, .cat-row {
+    --cc: var(--slate);
+    --cc-soft: var(--slate-soft);
+}
+
+.cat-row {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr) auto auto 30px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.cat-row + .cat-row { border-top: 1px solid var(--row-line); }
+
+/* The mark is one glyph doing the work of a word, so its field is sized for
+   one glyph and centred like a stamp rather than like text. */
+.cat-mark {
+    width: 62px;
+    padding: 8px 0;
+    text-align: center;
+    font-size: 19px;
+    line-height: 1.2;
+    border-radius: 10px;
+    background: var(--cc-soft);
+    border-color: transparent;
+}
+
+.cat-mark:focus { background: var(--paper); }
+.cat-name { padding: 9px 12px; font-size: 14px; font-weight: 600; }
+
+.tone-pick { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.tone-dot {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    background: var(--tone);
+    cursor: pointer;
+    transition: transform .12s ease, border-color .12s ease;
+}
+
+.tone-dot:hover { transform: scale(1.15); }
+.tone-dot.is-on { border-color: var(--ink); }
+
+.cat-use { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cat-use.is-idle { color: var(--ink-3); }
+.cat-row .row-x:disabled { opacity: .3; cursor: default; }
+.cat-row .row-x:disabled:hover { background: transparent; color: var(--ink-3); }
+
+@media (max-width: 760px) {
+    .cat-row {
+        grid-template-columns: 62px minmax(0, 1fr) 30px;
+        grid-template-areas: "mark name x" ".    tone tone" ".    use  use";
+        gap: 8px 12px;
+    }
+    .cat-mark { grid-area: mark; }
+    .cat-name { grid-area: name; }
+    .tone-pick { grid-area: tone; }
+    .cat-use { grid-area: use; }
+    .cat-row .row-x { grid-area: x; }
+}
+
+/* ==========================================================================
+   Toast — say what happened, offer the way back
+
+   A dialog before the fact stops you to ask; a toast after the fact tells
+   you and gets out of the way. The rule for which to use is whether the
+   action can be taken back: deleting a category can, so it just happens and
+   this line offers Undo. Deleting a trip cannot — its stops, bookings and
+   packing list go with it — so that one still asks first.
+
+   The ground is `--ink` on `--paper`, which is the page's own pair the wrong
+   way round. It inverts with the theme for free and is never less than 12:1.
+   ========================================================================== */
+.toast-wrap {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(560px, calc(100vw - 28px));
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 14px 13px 17px;
+    border-radius: 13px;
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+    font-size: 13.5px;
+    line-height: 1.45;
+    pointer-events: auto;
+    animation: toast-in .18s ease;
+}
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+.toast .msg { flex: 1 1 auto; min-width: 0; }
+.toast .msg b { font-weight: 700; }
+
+.toast .act {
+    flex: 0 0 auto;
+    padding: 7px 13px;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--paper);
+    cursor: pointer;
+    transition: background .14s ease;
+}
+
+.toast .act:hover { background: rgba(255, 255, 255, .16); }
+:root[data-theme="dark"] .toast .act { border-color: rgba(0, 0, 0, .28); }
+:root[data-theme="dark"] .toast .act:hover { background: rgba(0, 0, 0, .16); }
+
+.toast .x {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    font: inherit;
+    font-size: 11px;
+    color: var(--paper);
+    opacity: .6;
+    cursor: pointer;
+}
+
+.toast .x:hover { opacity: 1; }
+
+@media (max-width: 560px) {
+    .toast-wrap { bottom: 12px; }
+    .toast { flex-wrap: wrap; gap: 10px; }
+    .toast .msg { flex: 1 1 100%; }
+}
+
+/* The Google push borrows the rate button's spinner. */
+.ghost-btn.is-loading i { animation: fx-spin 0.9s linear infinite; }
+
+/* --------------------------------------------------------------------------
+   The holiday country
+
+   Beside the search box rather than among the chips: both are things you set
+   before you read the calendar, and they are the same kind of control, so
+   they are built the same way — an icon inside the field, a solid border, and
+   the same height. Chips are on/off; this one holds a value, and dressing it
+   as a chip said the wrong thing about it.
+   -------------------------------------------------------------------------- */
+.cal-pick { position: relative; display: flex; align-items: center; flex: 0 0 auto; }
+
+.cal-pick > i {
+    position: absolute;
+    left: 13px;
+    font-size: 13px;
+    color: var(--ink-3);
+    pointer-events: none;
+}
+
+.cal-pick select {
+    width: auto;
+    min-width: 0;
+    padding-left: 34px;
+    padding-right: 30px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+
+.cal-pick:hover select { border-color: var(--azure); color: var(--ink); }
+.cal-pick:hover > i { color: var(--azure-ink); }
+.cal-pick select:focus { color: var(--ink); }
+

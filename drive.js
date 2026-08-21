@@ -1,0 +1,531 @@
+/**
+ * ====================================================================
+ * PlanSphere — the copy that lives in Google Drive
+ * --------------------------------------------------------------------
+ * The browser stays the working store. It is instant, it works with no
+ * network and no account, and PlanSphere is fully usable if this file
+ * never loads at all. Drive is the *second* copy: the one that survives a
+ * cleared browser, and the one you can pull down onto another machine or
+ * a phone.
+ *
+ * That ordering is the whole design. A planner that cannot open because
+ * Google is having a bad morning is a worse planner than one that keeps
+ * its trips locally and sends them up when asked.
+ *
+ * What goes up is exactly what Export writes — the same envelope, the same
+ * format field. So a file pulled off Drive can be fed to Import, and a
+ * file made by Export can be dropped into the Drive folder by hand. One
+ * format, three routes in.
+ *
+ * On scope: this asks for `drive.file`, which grants access only to files
+ * this app itself created. It cannot read your other documents and it
+ * cannot list your Drive. That is deliberate, and it is also why it needs
+ * no review from Google — the wider scopes do.
+ * ====================================================================
+ */
+
+(() => {
+
+    const $ = (id) => document.getElementById(id);
+
+    const SCOPE  = 'https://www.googleapis.com/auth/drive.file';
+    const API    = 'https://www.googleapis.com/drive/v3';
+    const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+
+    const cfg = (typeof PS_DRIVE !== 'undefined') ? PS_DRIVE : null;
+
+    /**
+     * Drive and Calendar are the same app on the same origin, so one OAuth
+     * client covers both and `drive-config.js` ships pointing at Calendar's.
+     * Google asks for each permission separately as it is first needed, so
+     * sharing the client does not widen anything.
+     */
+    function clientId() {
+        const own = cfg && cfg.clientId;
+        if (own && !/SAME-AS-CALENDAR|YOUR-CLIENT-ID/i.test(own)) return own;
+        const shared = (typeof PS_GCAL !== 'undefined') ? PS_GCAL.clientId : '';
+        return (shared && !/YOUR-CLIENT-ID/i.test(shared)) ? shared : '';
+    }
+
+    const configured = () => !!cfg && !!cfg.folderId && !!clientId();
+
+    /** The current access token, and when it stops being any use. */
+    let token = null;
+    let tokenExpires = 0;
+    let tokenClient = null;
+
+    /** The Drive file id, once found or created. Cached so each save is one call. */
+    let fileId = null;
+
+    const valid = () => token && Date.now() < tokenExpires - 60000;
+
+    /* ------------------------------------------------------------------ *
+     * Signing in
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Google's library is loaded from their CDN by a tag in index.html. If
+     * the network is down, or a blocker ate it, every Drive button has to
+     * fail with something a person can act on rather than
+     * `google is not defined`.
+     */
+    function library() {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+            throw new Error('Google’s sign-in library did not load. Check the connection, '
+                + 'or whether an extension is blocking accounts.google.com.');
+        }
+        return google.accounts.oauth2;
+    }
+
+    /**
+     * Asks for a token, silently if Google already knows the answer.
+     *
+     * `prompt: ''` means "do not put a window in front of them if you do not
+     * have to". The first time, and after a consent is revoked, Google
+     * ignores that and shows the picker anyway — which is correct, and is
+     * the only time this should interrupt anyone.
+     */
+    function authorize(interactive) {
+        return new Promise((resolve, reject) => {
+            if (valid()) return resolve(token);
+
+            const oauth2 = library();
+
+            if (!tokenClient) {
+                tokenClient = oauth2.initTokenClient({
+                    client_id: clientId(),
+                    scope: SCOPE,
+                    callback: () => {},          // replaced per request, below
+                });
+            }
+
+            tokenClient.callback = (response) => {
+                if (response.error) {
+                    /* access_denied is a person clicking Cancel, not a fault. */
+                    if (/access_denied|user_cancel/i.test(response.error)) {
+                        return reject(new Error('Sign-in was cancelled, so nothing was sent to Drive.'));
+                    }
+                    return reject(new Error('Google refused the sign-in: ' + response.error));
+                }
+                token = response.access_token;
+                tokenExpires = Date.now() + (Number(response.expires_in || 3600) * 1000);
+                resolve(token);
+            };
+
+            tokenClient.error_callback = (err) => {
+                reject(new Error(err && err.type === 'popup_closed'
+                    ? 'The Google sign-in window was closed before it finished.'
+                    : 'The Google sign-in window could not open. Allow pop-ups for this site and try again.'));
+            };
+
+            tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+        });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Talking to Drive
+     * ------------------------------------------------------------------ */
+
+    /**
+     * Every Drive response goes through here. A 401 means the token went
+     * stale mid-flight, which is normal after an hour and is worth exactly
+     * one silent retry rather than an error in somebody's face.
+     */
+    async function call(url, options = {}, retrying = false) {
+        const response = await fetch(url, {
+            ...options,
+            headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token },
+        });
+
+        if (response.status === 401 && !retrying) {
+            token = null;
+            await authorize(false);
+            return call(url, options, true);
+        }
+
+        if (!response.ok) {
+            let detail = '';
+            try {
+                const body = await response.json();
+                detail = (body.error && body.error.message) || '';
+            } catch (err) { /* a non-JSON error body tells us nothing extra */ }
+
+            if (response.status === 403 && /insufficient|permission/i.test(detail)) {
+                throw new Error('Google allowed the sign-in but refused the folder. Check that the '
+                    + 'folder ID in drive-config.js is a folder this account can edit.');
+            }
+            if (response.status === 404) {
+                throw new Error('That folder no longer exists, or this account cannot see it. '
+                    + 'Check the folder ID in drive-config.js.');
+            }
+            throw new Error('Drive refused the request (' + response.status + ')'
+                + (detail ? ': ' + detail : '.'));
+        }
+
+        return response;
+    }
+
+    /**
+     * Finds the app's file in the folder, or reports that there is not one
+     * yet.
+     *
+     * The query is scoped to the folder *and* the name, because a
+     * `drive.file` search only ever sees files this app made — so a file
+     * dragged in by hand is invisible here, and a second one would
+     * otherwise be created silently beside it.
+     */
+    async function findFile() {
+        if (fileId) return fileId;
+
+        const query = encodeURIComponent(
+            `'${cfg.folderId}' in parents and name = '${cfg.filename}' and trashed = false`);
+        const response = await call(
+            `${API}/files?q=${query}&fields=files(id,name,modifiedTime)&pageSize=1`);
+        const body = await response.json();
+
+        fileId = (body.files && body.files[0] && body.files[0].id) || null;
+        return fileId;
+    }
+
+    async function readFile(id) {
+        const response = await call(`${API}/files/${id}?alt=media`);
+        return response.json();
+    }
+
+    /** When Drive last saw a change, so a pull can say how old its copy is. */
+    async function fileModified(id) {
+        const response = await call(`${API}/files/${id}?fields=modifiedTime`);
+        const body = await response.json();
+        return body.modifiedTime || null;
+    }
+
+    /**
+     * Creates the file the first time and updates it every time after. The
+     * create is a multipart upload because the metadata (name, parent
+     * folder) and the content have to arrive together, or the file lands in
+     * the root of My Drive instead of the folder that was asked for.
+     */
+    async function writeFile(envelope) {
+        const body = JSON.stringify(envelope, null, 2);
+        const id = await findFile();
+
+        if (id) {
+            await call(`${UPLOAD}/files/${id}?uploadType=media`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+            });
+            return id;
+        }
+
+        const boundary = 'plansphere-' + Math.random().toString(36).slice(2);
+        const metadata = { name: cfg.filename, parents: [cfg.folderId], mimeType: 'application/json' };
+        const multipart =
+            `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`
+            + JSON.stringify(metadata)
+            + `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n`
+            + body
+            + `\r\n--${boundary}--`;
+
+        const response = await call(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+            body: multipart,
+        });
+
+        fileId = (await response.json()).id;
+        return fileId;
+    }
+
+    /* ------------------------------------------------------------------ *
+     * The two buttons
+     * ------------------------------------------------------------------ */
+
+    function notConfigured() {
+        ask('Drive is not set up yet',
+            'Paste your Google OAuth client ID into gcal-config.js — docs/DRIVE.md walks '
+            + 'through making one, and the same client covers Calendar and Drive. Until then, '
+            + 'Export and Import still work and still keep everything safe.', null);
+    }
+
+    function flash(btn, html) {
+        if (!btn) return;
+        if (!btn.dataset.rest) btn.dataset.rest = btn.innerHTML;
+        btn.innerHTML = html;
+        clearTimeout(btn._flash);
+        btn._flash = setTimeout(() => { btn.innerHTML = btn.dataset.rest; }, 2400);
+    }
+
+    async function push(btn) {
+        if (!configured()) return notConfigured();
+
+        try {
+            flash(btn, '<i class="bi bi-arrow-repeat"></i><span>Sending…</span>');
+            await authorize(false);
+            await writeFile(psEnvelope());
+            remember();
+            flash(btn, '<i class="bi bi-check-lg"></i><span>In Drive</span>');
+        } catch (err) {
+            ask('Could not save to Drive', err.message, null);
+        }
+    }
+
+    /**
+     * Pulling is the dangerous direction — it replaces what is on this
+     * machine — so it goes through the same confirmation Import does, and
+     * says what is in both copies before anyone agrees to anything.
+     */
+    async function pull(btn) {
+        if (!configured()) return notConfigured();
+
+        try {
+            flash(btn, '<i class="bi bi-arrow-repeat"></i><span>Reading…</span>');
+            await authorize(false);
+
+            const id = await findFile();
+            if (!id) {
+                return ask('There is nothing in Drive yet',
+                    'PlanSphere has not written to that folder before. Press “To Drive” first, and '
+                    + 'this becomes the way to get everything onto another computer.', null);
+            }
+
+            const envelope = await readFile(id);
+            const held = psUnwrap(envelope);
+            if (!held) {
+                return ask('That Drive file is not readable',
+                    'The file in the folder is not a PlanSphere backup. Rename or remove it and '
+                    + 'press “To Drive” to write a fresh one.', null);
+            }
+
+            const modified = (await fileModified(id) || '').slice(0, 10) || 'an unknown date';
+
+            ask('Replace what is here with the Drive copy?',
+                'Drive holds ' + psSummary(held) + ', last written ' + modified + '. '
+                + 'This browser holds ' + psSummary(db) + ', and all of it will be replaced. '
+                + 'If this machine has the newer plan, cancel and press “To Drive” instead.',
+                () => psApply(held));
+        } catch (err) {
+            ask('Could not read from Drive', err.message, null);
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Sending it up on its own
+     * ------------------------------------------------------------------ *
+     * Off by default, and it has to be: this file's whole promise is that
+     * nothing leaves the browser unless somebody presses a button. A switch
+     * makes that a choice rather than a change made on everyone's behalf.
+     *
+     * Two rules keep it from being obnoxious once it is on:
+     *
+     *   It never opens a sign-in window. A popup nobody asked for gets
+     *   blocked, and a popup that is not blocked is worse. If the token has
+     *   lapsed the automatic push simply stands down and the stamp goes
+     *   stale, which is exactly the signal that says "press the button".
+     *
+     *   It waits for the changes to stop. A push per keystroke would be a
+     *   hundred writes to Drive for one evening of planning.
+     */
+    const AUTO_KEY  = 'plansphere.drive.auto';
+    const AUTO_WAIT = 60000;
+
+    let autoTimer = null;
+
+    const autoOn = () => {
+        try { return localStorage.getItem(AUTO_KEY) === 'on'; } catch (err) { return false; }
+    };
+
+    function setAuto(on) {
+        try { localStorage.setItem(AUTO_KEY, on ? 'on' : 'off'); } catch (err) { /* not vital */ }
+        paintAuto();
+        /* The stamp's wording depends on the switch — "Auto is waiting on you"
+           is only true while it is on — so it is repainted with it. */
+        showStamp();
+        if (on) schedule(); else clearTimeout(autoTimer);
+    }
+
+    function paintAuto() {
+        const btn = $('driveAuto');
+        if (!btn) return;
+        const on = autoOn();
+        btn.classList.toggle('is-on', on);
+        btn.setAttribute('aria-pressed', String(on));
+        btn.title = on
+            ? 'Sending a copy to Drive about a minute after you stop changing things. Click to stop.'
+            : 'Off — nothing goes to Drive unless you press “To Drive”. Click to send it automatically.';
+    }
+
+    /** Called by save() in app.js whenever anything changes. */
+    function schedule() {
+        if (!autoOn() || !configured()) return;
+        clearTimeout(autoTimer);
+        autoTimer = setTimeout(run, AUTO_WAIT);
+    }
+
+    async function run() {
+        if (!autoOn() || !configured()) return;
+
+        /* A token is good for about an hour and is held in memory only, so a
+           reload loses it. `authorize(false)` asks Google for a fresh one
+           *without* a prompt: where the grant is still in place it comes back
+           silently; where it is not, this stands down and the stamp turns
+           stale asking for one press. Only ever while the tab is actually
+           being looked at — nothing should wake a background tab into a
+           sign-in window. */
+        if (!valid()) {
+            if (document.visibilityState !== 'visible') return;
+            try { await authorize(false); } catch (err) { showStamp(); return; }
+        }
+
+        try {
+            await writeFile(psEnvelope());
+            remember();
+        } catch (err) {
+            /* A failed automatic push is not worth a dialog in front of
+               somebody who did not ask for one. The stamp going stale is the
+               honest signal, and pressing the button gives the real error. */
+            showStamp();
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
+     * "Last saved" — the only status worth showing
+     * ------------------------------------------------------------------ */
+
+    const STAMP_KEY = 'plansphere.drive.lastPush';
+
+    function remember() {
+        try { localStorage.setItem(STAMP_KEY, new Date().toISOString()); } catch (err) { /* not vital */ }
+        showStamp();
+    }
+
+    /**
+     * Three states, and only one of them says anything in words.
+     *
+     * A status you have to interpret every time you glance at a toolbar is a
+     * tax on nothing, so a working backup is a small cloud with a tick and
+     * the detail in its tooltip. Words appear **only when something needs
+     * pressing**. What must never happen is silence *and* a broken backup —
+     * that one case is the whole reason this exists.
+     */
+    function showStamp() {
+        const el = $('driveStamp');
+        const line = $('driveWhen');
+
+        let stamp = null;
+        try { stamp = localStorage.getItem(STAMP_KEY); } catch (err) { stamp = null; }
+
+        const show = (state, html, title, words) => {
+            if (el) {
+                el.dataset.state = state;
+                el.innerHTML = html;
+                el.title = title;
+                el.hidden = !html;
+            }
+            if (line) line.textContent = words;
+        };
+
+        if (!configured()) {
+            return show('none', '', '', 'Drive is not set up yet — see docs/DRIVE.md.');
+        }
+
+        if (!stamp) {
+            /* Auto cannot make the first push itself: Google only signs anyone
+               in when they ask it to. Say what to do, not what is true. */
+            if (autoOn()) {
+                return show('warn', '<i class="bi bi-cloud-slash-fill"></i>',
+                    'Auto is on, but Google will only sign you in when you ask it to — press “To Drive” once.',
+                    'Auto is on, but the first copy has to be one you send. Press “To Drive” once; '
+                    + 'after that it keeps itself up to date.');
+            }
+            return show('none', '', '', 'Nothing has been sent to Drive from this browser yet.');
+        }
+
+        const then = new Date(stamp);
+        const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+        const when = days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+
+        /* A week without a copy is worth interrupting for; anything less is not. */
+        if (days >= 7) {
+            return show('warn', '<i class="bi bi-cloud-slash-fill"></i>',
+                'The last copy went to Drive on ' + then.toLocaleString() + '.',
+                'The last copy went up ' + when + ', on ' + then.toLocaleString() + '. If Auto is on, '
+                + 'Google has probably stopped signing you in without being asked — one press fixes it.');
+        }
+
+        show('ok', '<i class="bi bi-cloud-check-fill"></i>',
+            'In Drive, ' + when + ' · ' + then.toLocaleString(),
+            'In Drive, ' + when + ' — ' + then.toLocaleString() + '.');
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Coming back to an empty browser
+     * ------------------------------------------------------------------ *
+     * The moment a Drive copy actually earns its keep: this machine has
+     * nothing on it, and there may well be a plan sitting in the folder.
+     * Without this you would have to know to press "From Drive" — and
+     * somebody whose browser has just been cleared is exactly the person who
+     * does not.
+     *
+     * It offers rather than does. A pull replaces what is here, and a silent
+     * one would be a network call and a sign-in nobody asked for — and a
+     * sign-in popup not started by a click gets blocked anyway.
+     *
+     * **It must not be asked before the records are loaded.** They come out
+     * of IndexedDB asynchronously, so for a moment after DOMContentLoaded the
+     * store is legitimately empty and this would announce that a whole plan
+     * was missing.
+     */
+    function offerPull() {
+        const bar = $('driveOffer');
+        if (!bar) return;
+        if (!configured() || typeof psIsEmpty !== 'function' || !psIsEmpty()) return;
+        bar.hidden = false;
+    }
+
+    /* ------------------------------------------------------------------ */
+
+    function start() {
+        const up = $('drivePush');
+        if (up) up.addEventListener('click', () => push(up));
+
+        const down = $('drivePull');
+        if (down) down.addEventListener('click', () => pull(down));
+
+        const auto = $('driveAuto');
+        if (auto) auto.addEventListener('click', () => setAuto(!autoOn()));
+
+        /* The only way in from app.js. It is a no-op when the switch is off,
+           so save() needs to know nothing about any of this. */
+        window.PSDriveTouch = schedule;
+
+        const offer = $('driveOfferPull');
+        if (offer) {
+            offer.addEventListener('click', () => {
+                const bar = $('driveOffer');
+                if (bar) bar.hidden = true;
+                pull(offer);
+            });
+        }
+
+        const dismiss = $('driveOfferNo');
+        if (dismiss) {
+            dismiss.addEventListener('click', () => {
+                const bar = $('driveOffer');
+                if (bar) bar.hidden = true;
+            });
+        }
+
+        paintAuto();
+        showStamp();
+
+        /* Only once app.js says the records are in memory. Either order is
+           possible: on the localStorage fallback the app is ready before this
+           runs, and on IndexedDB it is not. */
+        if (window.PSReady) offerPull();
+        else document.addEventListener('plansphere:ready', offerPull, { once: true });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+})();

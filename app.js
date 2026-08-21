@@ -296,11 +296,27 @@ const OLD_KEYS = ['plansphere.v1'];
 
 let db = { trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [], notes: [], spend: [], spendCats: [], docs: [], roles: [], settle: [], homeCountry: 'MY', current: null, saved: null };
 
+/* The records live in IndexedDB when there is one — see store.js for why.
+   `held` and `keep` are the only two places in the app that touch a
+   backend, and both fall back to localStorage when store.js did not load,
+   because they sit between a keystroke and the floor. */
+const haveStore = () => typeof PSStore !== 'undefined';
+
+function held(key) {
+    if (haveStore()) return PSStore.get(key);
+    try { return localStorage.getItem(key); } catch (err) { return null; }
+}
+
+function keep(key, value) {
+    if (haveStore()) return PSStore.set(key, value);
+    try { localStorage.setItem(key, value); return true; } catch (err) { return false; }
+}
+
 function load() {
     OLD_KEYS.forEach((k) => { try { localStorage.removeItem(k); } catch (err) { /* nothing to clear */ } });
 
     try {
-        const raw = localStorage.getItem(KEY);
+        const raw = held(KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
             db = Object.assign(db, parsed);
@@ -365,9 +381,12 @@ function load() {
 
 function save() {
     db.saved = new Date().toISOString();
-    try { localStorage.setItem(KEY, JSON.stringify(db)); }
-    catch (err) { /* storage full or blocked — the session still works */ }
+    keep(KEY, JSON.stringify(db));
     paintStamp();
+
+    /* A no-op unless the Drive switch is on. save() knows nothing about
+       Google beyond the fact that something might want telling. */
+    if (typeof window.PSDriveTouch === 'function') window.PSDriveTouch();
 }
 
 function paintStamp() {
@@ -4738,11 +4757,146 @@ function closeAsk() {
     askThen = null;
 }
 
+/* --------------------------------------------------------------------
+   The Data panel
+
+   Where the records are, how much room is left, and the three ways out of
+   here. It is one dialog rather than a row of buttons because there is
+   enough to say about a backup that a toolbar was hiding most of it.
+   -------------------------------------------------------------------- */
+function openData() {
+    paintStorage();
+    $('dataBox').hidden = false;
+}
+
+const closeData = () => { $('dataBox').hidden = true; };
+
+function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+}
+
+async function paintStorage() {
+    if (!haveStore()) {
+        set('dataWhere', 'In this browser’s localStorage.');
+        return set('dataUsed', '');
+    }
+
+    const backend = PSStore.backend();
+    const used = PSStore.usedBytes();
+    const budget = await PSStore.measure();
+    const kept = await PSStore.persisted();
+
+    set('dataWhere', backend === 'indexedDB'
+        ? 'In this browser, in IndexedDB.'
+            + (kept ? ' Marked to be kept — the browser will not clear it to free space.' : '')
+        : 'In this browser’s localStorage. IndexedDB was not available, so the ceiling is about 5 MB —'
+            + ' pictures are what will reach it.');
+
+    /* Against the ceiling rather than against itself: the question here is
+       how much room is left, and a bar that rescales to whatever is stored
+       can never answer it. */
+    const pct = Math.min(100, used / budget * 100);
+    const fill = $('dataMeterFill');
+    if (fill) {
+        fill.style.width = Math.max(0.4, pct).toFixed(2) + '%';
+        fill.className = pct > 90 ? 'is-over' : (pct > 70 ? 'is-warn' : '');
+    }
+    set('dataUsed', fmtSize(used) + ' of ' + fmtSize(budget)
+        + (pct < 1 ? ' — barely a dent' : ' — ' + pct.toFixed(1) + '%'));
+}
+
+/** Told by store.js every time a write lands or fails. A warning that
+    never clears itself is a warning people learn to ignore, so a
+    successful write takes the last one down. */
+let storeSaid = false;
+
+function storeReport(err) {
+    if (!err) {
+        if (storeSaid) { storeSaid = false; toast('Saved again — whatever was blocking it has cleared.'); }
+        return;
+    }
+    if (storeSaid) return;
+    storeSaid = true;
+    toast('<b>That did not save.</b> The browser refused the write — '
+        + (/quota|full/i.test(err.message || '') ? 'there is no room left. Export a copy, then delete some receipts or photos.'
+            : 'try Export to get a copy out while you can.'));
+}
+
 /* ====================================================================
-   EXPORT / IMPORT
+   EXPORT / IMPORT / DRIVE
+
+   One shape, three routes in and out. What Export writes to a file is
+   exactly what goes up to Drive, so a file pulled off Drive can be fed to
+   Import, and a file made by Export can be dropped into the Drive folder
+   by hand.
+
+   The envelope wraps the store rather than being it: a `format` field is
+   what lets Import refuse somebody's tax return with a sentence instead of
+   a stack trace, and a `saved` stamp is what lets a pull say how old the
+   Drive copy is before anybody agrees to overwrite anything.
    ==================================================================== */
+const BACKUP_FORMAT = 'plansphere.backup';
+
+function psEnvelope() {
+    return {
+        format: BACKUP_FORMAT,
+        version: 1,
+        app: 'PlanSphere',
+        saved: new Date().toISOString(),
+        data: db,
+    };
+}
+
+/** The store inside a file, whichever shape it arrived in, or null.
+ *  Files written before the envelope existed are the bare store, and they
+ *  still open — a backup that stops working is not a backup. */
+function psUnwrap(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (parsed.format === BACKUP_FORMAT && parsed.data && Array.isArray(parsed.data.trips)) return parsed.data;
+    if (Array.isArray(parsed.trips)) return parsed;
+    return null;
+}
+
+/** What is in a store, in words, for the dialogs that ask before replacing. */
+function psSummary(bag) {
+    if (!bag) return 'nothing';
+    const bits = [
+        [bag.trips, 'trip'],
+        [bag.stops, 'stop'],
+        [bag.spend, 'expense'],
+        [bag.notes, 'note'],
+        [bag.docs, 'document'],
+    ].filter(([list]) => Array.isArray(list) && list.length)
+        .map(([list, word]) => plural(list.length, word));
+    return bits.length ? bits.join(', ') : 'nothing yet';
+}
+
+/** True when there is nothing here worth keeping — what the Drive offer
+ *  checks before suggesting a pull. The default vocabulary lists do not
+ *  count: every browser has those from the first load. */
+function psIsEmpty() {
+    return !['trips', 'stops', 'books', 'packs', 'events', 'notes', 'spend', 'docs']
+        .some((k) => Array.isArray(db[k]) && db[k].length);
+}
+
+/** Replaces everything with a store from a file or from Drive, then
+ *  reloads — every screen reads the store once at start-up. */
+function psApply(bag) {
+    db = Object.assign({
+        trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [],
+        notes: [], spend: [], spendCats: [], docs: [], roles: [], settle: [], current: null,
+    }, bag);
+    if (!db.trips.some((t) => t.id === db.current)) db.current = db.trips.length ? db.trips[0].id : null;
+    save();
+    if (haveStore()) PSStore.flush().then(() => location.reload());
+    else location.reload();
+}
+
 function exportAll() {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(psEnvelope(), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -4758,21 +4912,20 @@ function importAll(file) {
     reader.onload = () => {
         let parsed;
         try { parsed = JSON.parse(String(reader.result)); }
-        catch (err) { return ask('That file did not open', 'It is not a PlanSphere export, or it was edited by hand.', null); }
+        catch (err) { parsed = null; }
 
-        if (!parsed || !Array.isArray(parsed.trips)) {
-            return ask('That file did not open', 'It has no trips in it, so there is nothing to restore.', null);
+        const bag = psUnwrap(parsed);
+        if (!bag) {
+            return ask('That file did not open',
+                'It is not a PlanSphere backup — there are no trips in it, so there is nothing '
+                + 'to restore. Export writes the kind of file this expects.', null);
         }
 
-        ask('Replace everything?',
-            'Importing throws away the ' + plural(db.trips.length, 'trip') + ' on this device and puts the file in its place.',
-            () => {
-                db = Object.assign({ trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [], notes: [], spend: [], spendCats: [], docs: [], roles: [], settle: [], current: null }, parsed);
-                if (!db.trips.some((t) => t.id === db.current)) db.current = db.trips.length ? db.trips[0].id : null;
-                save();
-                showModule('dash');
-                repaint();
-            });
+        ask('Replace everything with this file?',
+            'The file holds ' + psSummary(bag) + '. This browser holds ' + psSummary(db)
+            + ', and all of it will be replaced — importing never merges, because two '
+            + 'disagreeing copies of the same trip is a worse answer than one.',
+            () => psApply(bag));
     };
     reader.readAsText(file);
 }
@@ -6208,7 +6361,21 @@ function pinRate() {
    lists are rebuilt on every save, and handlers bound to rows that no
    longer exist are the classic way a rebuilt list stops responding.
    ==================================================================== */
+/**
+ * The records come out of IndexedDB asynchronously, so the first paint has
+ * to wait for them — otherwise every screen renders empty for a frame and
+ * the Drive offer announces that a whole plan is missing.
+ *
+ * `initSync` is the escape hatch for wherever IndexedDB does not exist:
+ * there the app starts in the same tick it always did.
+ */
 function boot() {
+    if (typeof PSStore === 'undefined') return start();
+    if (PSStore.initSync(storeReport)) return start();
+    PSStore.init(storeReport).then(start);
+}
+
+function start() {
     load();
     fxLoad();
     holLoad();
@@ -6221,7 +6388,18 @@ function boot() {
     clearStopForm();
     clearBookForm();
     clearActForm();
-    showModule('cal');
+    showModule(live);
+
+    /* Once there is something worth keeping, ask the browser not to throw it
+       away when the disk gets tight. Asked once, and never on an empty first
+       visit — Firefox puts a prompt in front of this, and a prompt about
+       nothing is how people learn to refuse them. */
+    if (typeof PSStore !== 'undefined' && !psIsEmpty()) PSStore.persist();
+
+    /* Drive's offer waits on this: until it fires, an empty store means
+       "still loading", not "nothing here". */
+    window.PSReady = true;
+    document.dispatchEvent(new Event('plansphere:ready'));
 
     $('navToggle').addEventListener('click', toggleNav);
     $('navScrim').addEventListener('click', closeDrawer);
@@ -6577,6 +6755,7 @@ function boot() {
     /* Enter in a text field means "add the thing this form is for". */
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !$('askBox').hidden) return closeAsk();
+        if (event.key === 'Escape' && !$('dataBox').hidden) return closeData();
         if (event.key === 'Escape' && !$('newMenu').hidden) return toggleNewMenu(false);
 
         /* A card is a button, so it answers to the keys a button answers to. */
@@ -6613,10 +6792,15 @@ function boot() {
         renderBudget();
     });
 
+    $('saveStamp').addEventListener('click', openData);
+    $('dataClose').addEventListener('click', closeData);
+    $('dataBox').addEventListener('click', (event) => { if (event.target.id === 'dataBox') closeData(); });
+
     $('toolExport').addEventListener('click', exportAll);
     $('toolImport').addEventListener('click', () => $('toolFile').click());
     $('toolFile').addEventListener('change', (event) => {
         const file = event.target.files && event.target.files[0];
+        closeData();
         if (file) importAll(file);
         event.target.value = '';
     });

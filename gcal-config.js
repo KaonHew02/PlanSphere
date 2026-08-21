@@ -23,10 +23,18 @@ const PS_GCAL = {
      * Google Cloud → APIs & Services → Credentials → OAuth client ID
      * (Web application). It ends in `.apps.googleusercontent.com`.
      *
-     * Register the address you actually open the app on under "Authorised
-     * JavaScript origins" — `http://localhost:5173` for `node serve.js`.
+     * Register the **origin** you open the app on under "Authorised
+     * JavaScript origins" — scheme and host, no path:
+     *
+     *     https://kaonhew02.github.io      the published copy
+     *     http://localhost:5173            `node serve.js`
+     *
+     * PlanSphere's own client, in its own Google Cloud project. MoneyFlow
+     * and FinSim are published under the same origin and would have worked
+     * with theirs — the separate project is bookkeeping, so that revoking
+     * one app's access at myaccount.google.com does not revoke all three.
      */
-    clientId: 'YOUR-CLIENT-ID.apps.googleusercontent.com',
+    clientId: '340089513403-bi44vulb6bcjdisqpvetkcj2btui16ud.apps.googleusercontent.com',
 
     /**
      * The calendar PlanSphere creates and writes. It is a calendar of its

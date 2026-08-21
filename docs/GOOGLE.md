@@ -12,6 +12,8 @@ is safe to keep in `gcal-config.js`.
 
 ## Steps
 
+**[docs/SETUP-GOOGLE.md](SETUP-GOOGLE.md) walks through every click, and covers the Drive backup at the same time.** The short form:
+
 1. Open <https://console.cloud.google.com/> and pick a project, or make one.
    If you already have the project MoneyFlow's Drive backup uses, reuse it.
 2. **APIs & Services → Library** → search *Google Calendar API* → **Enable**.
@@ -20,9 +22,9 @@ is safe to keep in `gcal-config.js`.
    account. You do not need to publish it or submit anything for review.
 4. **APIs & Services → Credentials → Create credentials → OAuth client ID**.
    - Application type: **Web application**
-   - Authorised JavaScript origins: `http://localhost:5173`
-     (the address `node serve.js` serves on — add any other address you open
-     the app on)
+   - Authorised JavaScript origins: `https://kaonhew02.github.io` for the
+     published copy, and `http://localhost:5173` for `node serve.js`. Scheme
+     and host only — **no path**, so not `…/PlanSphere`.
    - **Do not** add a redirect URI. This flow does not use one.
 5. Copy the client ID — it ends in `.apps.googleusercontent.com` — and paste
    it into `gcal-config.js`.

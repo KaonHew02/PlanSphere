@@ -84,17 +84,62 @@
             <select id="tripPick"></select>
         </div>
 
+        <!-- Everything here is about the *second* copy: a file you keep, and
+             a file in your own Google Drive. The working store is the browser,
+             and nothing leaves it unpressed.
+
+             Same shape as MoneyFlow's and FinSim's toolbars on purpose — the
+             three are siblings, and a person who learns one has learned all
+             three. Grouped rather than laid out as five loose pills, because
+             five pills across a header read as five unrelated things. -->
         <div class="tools">
-            <span class="stamp" id="saveStamp"></span>
-            <button type="button" class="ghost-btn" id="toolExport" title="Save everything to a file you keep">
-                <i class="bi bi-download"></i><span>Export</span>
-            </button>
-            <button type="button" class="ghost-btn" id="toolImport" title="Restore everything from a file you exported">
-                <i class="bi bi-upload"></i><span>Import</span>
-            </button>
-            <input type="file" id="toolFile" accept=".json,application/json" hidden>
+            <button type="button" class="stamp" id="saveStamp"
+                    title="Where these records live, and how much room is left"></button>
+
+            <!-- Whether the second copy is any good, in one glyph. It says
+                 nothing at all while it is fine and recent. -->
+            <span class="drive-stamp" id="driveStamp"></span>
+
+            <div class="tool-group">
+                <button type="button" class="tool-btn drive-auto" id="driveAuto" aria-pressed="false"
+                        title="Off &mdash; nothing goes to Drive unless you press &quot;To Drive&quot;.">
+                    <i class="bi bi-arrow-repeat"></i><span>Auto</span>
+                </button>
+                <button type="button" class="tool-btn" id="drivePush" title="Send this browser's plan to your Google Drive folder">
+                    <i class="bi bi-cloud-arrow-up"></i><span>To Drive</span>
+                </button>
+                <button type="button" class="tool-btn" id="drivePull" title="Replace what is here with the copy in Google Drive">
+                    <i class="bi bi-cloud-arrow-down"></i><span>From Drive</span>
+                </button>
+            </div>
+
+            <div class="tool-group">
+                <button type="button" class="tool-btn" id="toolExport" title="Save everything to one file you keep">
+                    <i class="bi bi-download"></i><span>Export</span>
+                </button>
+                <button type="button" class="tool-btn" id="toolImport" title="Read a PlanSphere backup file back in">
+                    <i class="bi bi-upload"></i><span>Import</span>
+                </button>
+                <input type="file" id="toolFile" accept=".json,application/json" hidden>
+            </div>
         </div>
     </header>
+
+    <!-- Nothing here and something possibly in Drive: the one moment the
+         copy earns its keep. It offers rather than does — a pull replaces
+         what is on this machine, and a sign-in nobody clicked for gets
+         blocked by the browser anyway. -->
+    <div class="offer" id="driveOffer" hidden>
+        <i class="bi bi-cloud-arrow-down-fill"></i>
+        <div class="offer-say">
+            <b>This browser is empty.</b>
+            <span>If you have used PlanSphere before, there may be a copy in Google Drive.</span>
+        </div>
+        <button type="button" class="ghost-btn" id="driveOfferNo">Not now</button>
+        <button type="button" class="primary-btn" id="driveOfferPull">
+            <i class="bi bi-cloud-arrow-down"></i>Look in Drive
+        </button>
+    </div>
 
     <main class="main">
 
@@ -1523,6 +1568,36 @@
      bookings and list with it. Both are worth a sentence and a second click. -->
 <div class="toast-wrap" id="toastWrap"></div>
 
+<!-- ======================================================================
+     THE DATA PANEL
+
+     Everything about where the records are and how they get out of here,
+     in one place. It used to be two buttons in the top bar; there is now
+     enough to say about it that two buttons were hiding most of it.
+     ====================================================================== -->
+<div class="dialog" id="dataBox" hidden>
+    <div class="dialog-card is-wide" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
+        <h2 id="dataTitle">Your data</h2>
+
+        <section class="data-block">
+            <h3><i class="bi bi-hdd"></i>Where it lives</h3>
+            <p id="dataWhere">—</p>
+            <div class="data-meter"><span id="dataMeterFill"></span></div>
+            <p class="data-sub" id="dataUsed">—</p>
+        </section>
+
+        <section class="data-block">
+            <h3><i class="bi bi-google"></i>The second copy</h3>
+            <p class="data-sub" id="driveWhen">—</p>
+            <p class="data-note">Drive holds a <em>copy</em>, and so does an exported file &mdash; the same file either way. Nothing leaves this browser unless you press one of the buttons in the top bar, and PlanSphere works with no account at all.</p>
+        </section>
+
+        <div class="dialog-actions">
+            <button type="button" id="dataClose">Close</button>
+        </div>
+    </div>
+</div>
+
 <div class="dialog" id="askBox" hidden>
     <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="askTitle">
         <h2 id="askTitle">Are you sure?</h2>
@@ -1536,7 +1611,10 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="gcal-config.js"></script>
+<script src="drive-config.js"></script>
+<script src="store.js"></script>
 <script src="app.js"></script>
 <script src="gcal.js"></script>
+<script src="drive.js"></script>
 </body>
 </html>

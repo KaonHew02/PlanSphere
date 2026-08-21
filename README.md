@@ -4,23 +4,46 @@
 
 A travel planner that keeps one trip whole: the days, the bookings, the money
 and the list you check standing in the hallway. No account, no server — the
-store is `localStorage`, and every save is a write.
+records live in your own browser, and every save is a write. A copy in Google
+Drive is optional and off until you set it up.
 
 ## Running it
+
+Live at **<https://kaonhew02.github.io/PlanSphere/>**.
+
+Locally:
 
     node serve.js
 
 Then open <http://localhost:5173>. Opening `index.html` straight off disk
-mostly works, but `file://` applies different origin rules than a real host,
-so the server is the honest way to see it.
+mostly works, but `file://` applies different origin rules than a real host —
+and Google will not issue a token to a page that has no origin at all, so the
+Drive backup and the Calendar push need one of the two addresses above.
+
+### One origin, three apps
+
+`kaonhew02.github.io` is a single host: MoneyFlow, FinSim and PlanSphere all
+sit on it, and the project name is only a path. Two things follow.
+
+**They share a localStorage bucket** — one ~5 MB cap between the three of them,
+which is a large part of why PlanSphere's records moved to IndexedDB. Its
+database is its own (`plansphere`), and so is theirs.
+
+**They share an OAuth origin.** A client ID registered for
+`https://kaonhew02.github.io` works for all three, so PlanSphere's Drive backup
+can reuse the one MoneyFlow and FinSim already have. See
+[`docs/SETUP-GOOGLE.md`](docs/SETUP-GOOGLE.md).
 
 ## The files
 
 | File | What it is |
 | --- | --- |
-| `index.html` | The shell and all eight modules. Every screen is on the page; only one is visible. |
+| `index.html` | The shell and all ten screens. Every screen is on the page; only one is visible. |
 | `style.css` | Tokens first, then layout, then components, then responsive. Change a colour in one place. |
-| `app.js` | Store, navigation, and one renderer per module. |
+| `app.js` | The store in memory, navigation, and one renderer per screen. |
+| `store.js` | Where the records live — IndexedDB, with localStorage as the floor. |
+| `drive.js` | The copy in Google Drive. Inert until `gcal-config.js` has a client ID. |
+| `drive-config.js` | Which Drive folder, and which OAuth client. No secrets. |
 | `serve.js` | A static file server and nothing else. |
 | `gcal.js` | One-way push into Google Calendar. Inert until `gcal-config.js` has a client ID. |
 | `logo-icon.svg` | The mark, used in the sidebar and the rail. |
@@ -1138,9 +1161,87 @@ base, all 160-odd currencies, fetched once a day and crossed for every pair, so
 switching currencies never needs the network. It is deliberately outside the
 export: it is disposable, and it would only go stale in the file.
 
-**Export** writes that blob to a file. **Import** replaces what is on the
-device with it, after asking. Deleting a trip takes its stops, bookings,
-expenses, documents, notes and packing list with it — also after asking.
+### Where it actually lives
+
+**IndexedDB**, with localStorage as the floor.
+
+localStorage is capped at about 5 MB per origin and no setting anywhere raises
+it. For most apps that is roomy; for this one it is not, and the reason is
+pictures. A trip cover, a receipt off the camera, a boarding pass, a file on a
+stop — every one is a data URL in the same blob as the plan. They are resized
+on the way in, so a phone photograph lands at tens of kilobytes rather than
+four megabytes, but a trip with thirty receipts on it can still fill five
+megabytes and then **fail to save silently**, because a full localStorage
+throws on write and the app carries on with figures that are no longer written
+down anywhere.
+
+IndexedDB, same browser, same origin, is offered a share of free disk instead —
+about 3 GB on the machine this was written on. The Data panel says which
+backend is in use and how much of it is gone.
+
+The catch is that IndexedDB is asynchronous and this app reads its store
+synchronously. So `store.js` **mirrors everything in memory**: one read before
+the first paint, after which `get` is a plain object lookup. Writes update the
+mirror at once and reach the disk a quarter-second later, coalesced, so typing
+in a form is one write rather than one per keystroke. The first paint waits for
+that read — otherwise every screen renders empty for a frame and the Drive
+offer announces that a whole plan is missing.
+
+A failed write is **reported**, not swallowed: a toast says what happened and
+what to do, and it clears itself when a write next lands.
+
+The holiday and rate caches stay in localStorage. They are disposable, they are
+wanted before the first paint, and losing them costs one fetch.
+
+Once there is something worth keeping, the app asks the browser **not to throw
+the storage away** when the disk gets tight. Asked once, and never on an empty
+first visit — Firefox puts a prompt in front of that, and a prompt about
+nothing is how people learn to refuse them.
+
+### The three ways out
+
+The toolbar holds all of it, in the same shape MoneyFlow and FinSim wear —
+the three are siblings, and a person who learns one has learned all three.
+
+    ☁  [ Auto | To Drive | From Drive ]   [ Export | Import ]
+
+    Export      writes the whole store to a file you keep
+    To Drive    writes the same file into a Google Drive folder
+    From Drive  brings it back onto another machine
+    Import      reads either of them
+    Auto        sends a copy a minute after you stop changing things
+
+Clicking the *Saved* stamp says where the records live and how much room is
+left.
+
+One envelope, three routes:
+
+    { format: 'plansphere.backup', version: 1, app: 'PlanSphere',
+      saved: <iso>, data: { …the store… } }
+
+So a file pulled off Drive can be fed to Import, and a file made by Export can
+be dropped into the Drive folder by hand. Files written before the envelope
+existed are the bare store, and they still open — a backup that stops working
+is not a backup.
+
+**Import and From Drive replace, never merge**, and both say what is in each
+copy before they ask. Two disagreeing copies of the same trip is a worse answer
+than one. Both reload afterwards, because every screen reads the store once at
+start-up.
+
+Drive is off until `gcal-config.js` has an OAuth client ID — the same one the
+Calendar feature uses, since they are the same app on the same origin. The
+scope is `drive.file`: files this app created, and nothing else. It cannot read
+your other documents and it cannot list your Drive. **Never widen it.**
+`docs/SETUP-GOOGLE.md` walks through the Google Cloud setup click by click;
+`docs/DRIVE.md` covers what the buttons do and every error they can produce.
+
+A cloud in the toolbar says whether the second copy is any good — and says
+nothing at all while it is fine and recent, because silence is the correct
+report for "fine".
+
+Deleting a trip takes its stops, bookings, expenses, documents, notes and
+packing list with it — after asking.
 
 Photographs are the one thing that can fill this store, so every image the app
 takes in — trip covers, stop attachments, note files, receipts and scans — goes
@@ -1152,10 +1253,11 @@ and every screen below it says what has to exist before it can do anything.
 Create New on Trips & Events is the only thing that works on a blank store,
 which is the point.
 
-The store key is `plansphere.v2`. Opening the app clears `plansphere.v1`, the
-key everything was written under while the modules were being built — the
-shape changed under it often enough that carrying one forward would have meant
-guessing at what half its rows meant.
+The record key is `plansphere.v2`, in the `plansphere` IndexedDB database.
+Opening the app clears `plansphere.v1` from localStorage, the key everything
+was written under while the modules were being built — the shape changed under
+it often enough that carrying one forward would have meant guessing at what
+half its rows meant.
 
 A store written before the three kinds existed opens without trouble: a row
 that says nothing about its kind is a trip, its status is read off its dates

@@ -95,12 +95,19 @@ CUR_DATA.split('|').forEach((row) => {
 const CUR_ORDER = CUR_COMMON.filter((c) => CUR[c])
     .concat(Object.keys(CUR).filter((c) => CUR_COMMON.indexOf(c) < 0).sort());
 
-function moneyIn(sen, cur, opts) {
+/* Always to the currency's own decimal places, and there is no longer an
+   option to drop them.
+
+   There used to be a `{ round: true }` for figures you only glance at — a
+   budget headline, a bar on a chart. It read tidily and it was wrong: a
+   total of RM 24.70 printed as RM 25 above rows that add up to 24.70, and
+   a total that disagrees with the rows it totals is worse than a noisy one.
+   Fifty-odd call sites each got to make that mistake independently, so the
+   option is gone rather than audited. */
+function moneyIn(sen, cur) {
     const c = CUR[cur] || CUR.MYR;
-    const round = opts && opts.round;
-    const dp = round ? 0 : c.dp;
     const value = fromSen(sen || 0);
-    return c.pre + value.toLocaleString('en-MY', { minimumFractionDigits: dp, maximumFractionDigits: dp }) + c.post;
+    return c.pre + value.toLocaleString('en-MY', { minimumFractionDigits: c.dp, maximumFractionDigits: c.dp }) + c.post;
 }
 
 /** The currency this trip counts in. Everything totalled is totalled here. */
@@ -110,8 +117,8 @@ function homeCur() {
 }
 
 /** Formats in the current trip's own money. For anything else, moneyIn. */
-function money(sen, opts) {
-    return moneyIn(sen, homeCur(), opts);
+function money(sen) {
+    return moneyIn(sen, homeCur());
 }
 
 /** 1 home = N foreign, as typed on the Convert screen. null = not set. */
@@ -843,7 +850,24 @@ const SAVE_BTNS = ['actSave', 'tripSave', 'stopSave', 'bookSave', 'spendSave', '
 
 /* Home is where the app opens: "what have I got on" is the question
    people arrive with, and it is the one screen that answers it without
-   adding anything up. */
+   adding anything up.
+
+   Which makes it the one screen that must not be about whichever record
+   you last had open. It was: `db.current` is a pointer left behind by the
+   last thing you clicked, so Home would greet you with an event that
+   finished last week while three trips sat upcoming behind it. Arriving
+   at Home now moves that pointer to whatever is actually next — the
+   thing that is running, or the soonest thing that is not. */
+function focusNext() {
+    if (!db.trips.length) return;
+    /* Same order the shelf reads in: happening now, then soonest, then
+       most recently finished, then the undated. */
+    const near = db.trips.slice().sort(sortNearest)[0];
+    if (near && near.id !== db.current) {
+        db.current = near.id;
+        save();
+    }
+}
 let live = 'dash';
 
 function showModule(key) {
@@ -851,6 +875,11 @@ function showModule(key) {
     /* The six sub-screens are not sidebar destinations, so arriving at one
        means arriving at the record that owns it. */
     if (SUBS[key]) { subTab = key; live = 'trips'; } else { live = key; }
+
+    /* Walking in the front door re-points the app at what is next. Only on
+       the way in — not on every repaint, or a Home left open would move
+       under somebody mid-read. */
+    if (live === 'dash') focusNext();
 
     /* Leaving Activities closes whatever was open in it: coming back to the
        Calendar and then to Activities should show the shelf, not the middle
@@ -1027,7 +1056,7 @@ function renderDash() {
         set('dashLeftFoot', '—');
         ['dashNext', 'dashHold', 'dashPack', 'dashSettle'].forEach((id) =>
             html(id, emptyState('bi-compass', 'Nothing open',
-                'Open Trips & Events and create one — it takes a name and two dates.')));
+                'Open Activities and create one — it takes a name and two dates.')));
         return;
     }
 
@@ -1067,9 +1096,9 @@ function renderDash() {
         : 'Nothing on the itinerary yet');
 
     const left = sums.budget - sums.spent;
-    set('dashLeft', money(left, { round: true }));
+    set('dashLeft', money(left));
     set('dashLeftFoot', sums.budget
-        ? money(sums.spent, { round: true }) + ' of ' + money(sums.budget, { round: true }) + ' spent'
+        ? money(sums.spent) + ' of ' + money(sums.budget) + ' spent'
         : 'No budget set');
 
     paintNext(stops, now);
@@ -1098,7 +1127,7 @@ function renderSum() {
         $('sumEventCard').hidden = true;
         ['sumTop', 'sumSpend', 'sumStats', 'sumPeople'].forEach((id) =>
             html(id, emptyState('bi-bar-chart', 'Nothing open',
-                'Open Trips & Events and create one — there is nothing to add up yet.')));
+                'Open Activities and create one — there is nothing to add up yet.')));
         return;
     }
 
@@ -1130,12 +1159,12 @@ function paintSumTop(t, sums, length) {
             t.from ? fmtRange(t.from, t.to) : 'no dates set')
         + figure(kin.scope === 'event' ? 'Participants' : 'Members', String(heads),
             peopleOf(t).length ? peopleOf(t).length + ' named' : 'nobody named yet')
-        + figure('Budget', sums.budget ? money(sums.budget, { round: true }) : '—',
-            sums.budget ? money(Math.round(sums.budget / heads), { round: true }) + ' a head' : 'not set')
-        + figure('Spent', money(sums.spent, { round: true }),
+        + figure('Budget', sums.budget ? money(sums.budget) : '—',
+            sums.budget ? money(Math.round(sums.budget / heads)) + ' a head' : 'not set')
+        + figure('Spent', money(sums.spent),
             plural(mine(db.spend).length, 'expense') + ' recorded')
         + figure(left < 0 ? 'Over by' : 'Remaining',
-            sums.budget ? money(Math.abs(left), { round: true }) : '—',
+            sums.budget ? money(Math.abs(left)) : '—',
             sums.budget ? Math.round(sums.spent / sums.budget * 100) + '% of it gone' : 'set a budget')
         + '</div>');
 }
@@ -1163,9 +1192,9 @@ function paintSumEvent(t, sums) {
     set('sumEventNote', plural(people.length, 'person', 'people') + ' named');
 
     html('sumEvent', '<div class="dash-figures">'
-        + figure('Budget', sums.budget ? money(sums.budget, { round: true }) : '—',
+        + figure('Budget', sums.budget ? money(sums.budget) : '—',
             sums.budget ? '' : 'not set')
-        + figure('Actual', money(sums.spent, { round: true }),
+        + figure('Actual', money(sums.spent),
             plural(mine(db.spend).length, 'expense'))
         + figure('People', String(people.length), 'on the list')
         + figure('Cost / person', money(Math.round(sums.spent / people.length)), 'across the list')
@@ -1202,8 +1231,8 @@ function paintSumSpend(t, sums) {
     const budget = sums.budget;
     const over = budget && total > budget;
     set('sumSpendNote', budget
-        ? (over ? money(total - budget, { round: true }) + ' over' : money(budget - total, { round: true }) + ' left')
-        : money(total, { round: true }) + ' spent');
+        ? (over ? money(total - budget) + ' over' : money(budget - total) + ' left')
+        : money(total) + ' spent');
 
     /* Drawn against the budget where there is one, so the empty part of the
        track is money still unspent rather than dead space. Without a budget
@@ -1219,13 +1248,13 @@ function paintSumSpend(t, sums) {
         +   rows.map((r) => '<div class="break-row" style="' + tone(r.c) + '">'
                 + '<span class="dot"></span>'
                 + '<span class="br-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
-                + '<span class="br-val">' + money(r.sen, { round: true }) + '</span>'
+                + '<span class="br-val">' + money(r.sen) + '</span>'
                 + '<span class="br-pct">' + Math.round(r.sen / total * 100) + '%</span>'
                 + '</div>').join('')
         +   (budget && !over
                 ? '<div class="break-row is-idle"><span class="dot" style="background:var(--track-2)"></span>'
                     + '<span class="br-name">Unspent</span>'
-                    + '<span class="br-val">' + money(budget - total, { round: true }) + '</span>'
+                    + '<span class="br-val">' + money(budget - total) + '</span>'
                     + '<span class="br-pct">' + Math.round((budget - total) / budget * 100) + '%</span></div>'
                 : '')
         + '</div>');
@@ -1269,22 +1298,22 @@ function paintSumStats(t, sums, length) {
     set('sumStatNote', plural(spends.length, 'expense') + ' over ' + plural(live, 'day'));
 
     html('sumStats', '<div class="dash-figures">'
-        + figure('Total spending', money(sums.spent, { round: true }),
+        + figure('Total spending', money(sums.spent),
             plural(spends.length, 'expense') + ' recorded')
-        + figure('Average a day', money(perDay, { round: true }),
+        + figure('Average a day', money(perDay),
             'over ' + live + (days ? ' of ' + days : '') + ' days with spending')
-        + figure('Highest expense', moneyIn(homeOf({ cost: biggest.amount, cur: biggest.cur }, t), cur, { round: true }),
+        + figure('Highest expense', moneyIn(homeOf({ cost: biggest.amount, cur: biggest.cur }, t), cur),
             biggest.merchant || 'Unnamed')
-        + figure('Highest category', cat ? money(bag[topCat], { round: true }) : '—',
+        + figure('Highest category', cat ? money(bag[topCat]) : '—',
             cat ? cat.mark + ' ' + cat.label + ' · ' + Math.round(bag[topCat] / sums.spent * 100) + '%' : '')
         + figure('Budget used', sums.budget ? Math.round(sums.spent / sums.budget * 100) + '%' : '—',
-            sums.budget ? money(sums.budget - sums.spent, { round: true }) + ' left' : 'no budget set')
-        + figure('Planned vs actual', planned ? money(planned, { round: true }) : '—',
+            sums.budget ? money(sums.budget - sums.spent) + ' left' : 'no budget set')
+        + figure('Planned vs actual', planned ? money(planned) : '—',
             planned
-                ? (gap > 0 ? money(gap, { round: true }) + ' more than planned'
-                    : money(-gap, { round: true }) + ' less than planned')
+                ? (gap > 0 ? money(gap) + ' more than planned'
+                    : money(-gap) + ' less than planned')
                 : 'nothing priced on the itinerary')
-        + figure('Cost per person', money(Math.round(sums.spent / heads), { round: true }),
+        + figure('Cost per person', money(Math.round(sums.spent / heads)),
             'across ' + plural(heads, 'person', 'people'))
         + '</div>');
 }
@@ -1311,7 +1340,7 @@ function paintSumPeople(t) {
         +   '<span class="br-name">' + esc(r.person.name) + '</span>'
         +   '<span class="bb-track br-bar"><span class="bb-fill" style="width:'
         +     (r.share / top * 100).toFixed(1) + '%"></span></span>'
-        +   '<span class="br-val">' + money(r.share, { round: true }) + '</span>'
+        +   '<span class="br-val">' + money(r.share) + '</span>'
         +   '<span class="br-pct">' + Math.round(r.share / total * 100) + '%</span>'
         + '</div>').join('') + '</div>');
 }
@@ -1370,10 +1399,10 @@ function paintDashSettle(t) {
             + '<span class="person-mark is-sm">' + esc(initials(tr.fromName)) + '</span>'
             + '<div class="line-meta"><div class="line-name">' + esc(tr.fromName) + ' → ' + esc(tr.toName) + '</div>'
             +   '<small class="line-sub">' + (paid
-                    ? moneyIn(paid, t.home || 'MYR', { round: true }) + ' of it handed over'
+                    ? moneyIn(paid, t.home || 'MYR') + ' of it handed over'
                     : 'nothing handed over yet') + '</small></div>'
             + '<div class="line-figures"><div class="line-figure">'
-            +   '<b>' + moneyIn(tr.amount - paid, t.home || 'MYR', { round: true }) + '</b>'
+            +   '<b>' + moneyIn(tr.amount - paid, t.home || 'MYR') + '</b>'
             + '</div></div>'
             + '</div>';
     }).join(''));
@@ -1385,7 +1414,7 @@ function paintHold() {
         .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
     const owing = open.reduce((n, b) => n + (b.cost || 0), 0);
-    set('dashHoldNote', open.length ? money(owing, { round: true }) + ' still to pay' : '');
+    set('dashHoldNote', open.length ? money(owing) + ' still to pay' : '');
 
     if (!open.length) {
         return html('dashHold', emptyState('bi-check2-circle',
@@ -1685,9 +1714,9 @@ function tripCard(t) {
         +   '<dl class="tc-facts">'
         +     fact('bi-geo-alt-fill', kin.where, t.where || '—')
         +     fact('bi-people-fill', 'Members', String(t.who || 1))
-        +     fact('bi-wallet2', 'Budget', t.budget ? moneyIn(t.budget, cur, { round: true }) : '—')
+        +     fact('bi-wallet2', 'Budget', t.budget ? moneyIn(t.budget, cur) : '—')
         +     fact('bi-receipt', 'Committed',
-                '<span class="' + (over ? 'is-over' : '') + '">' + moneyIn(spent, cur, { round: true }) + '</span>')
+                '<span class="' + (over ? 'is-over' : '') + '">' + moneyIn(spent, cur) + '</span>')
         +   '</dl>'
         + '</div>'
 
@@ -2262,8 +2291,8 @@ function renderPlan() {
             +   '<span class="day-n">' + (n ? 'Day ' + n : 'Extra') + '</span>'
             +   '<span class="day-date">' + fmtDay(date) + '</span>'
             +   '<span class="day-meta">' + (list.length ? plural(list.length, 'stop') : 'Open')
-            +     (est ? ' · <b>' + money(est, { round: true }) + '</b>' : '')
-            +     (act ? ' <span class="day-act">actual ' + money(act, { round: true }) + '</span>' : '')
+            +     (est ? ' · <b>' + money(est) + '</b>' : '')
+            +     (act ? ' <span class="day-act">actual ' + money(act) + '</span>' : '')
             +   '</span>'
             + '</div>'
             /* What is pinned to this day, stated where the day is read
@@ -2919,8 +2948,8 @@ function renderBook() {
     }
 
     const sums = tally(t);
-    $('bookNote').innerHTML = money(sums.paid, { round: true }) + ' paid · <b>'
-        + money(sums.held + sums.idea, { round: true }) + '</b> still open';
+    $('bookNote').innerHTML = money(sums.paid) + ' paid · <b>'
+        + money(sums.held + sums.idea) + '</b> still open';
 
     const rows = list.map((b) => {
         const st = STATUS[b.status] || STATUS.idea;
@@ -3089,7 +3118,7 @@ function personCard(p, t) {
         +     '<span>' + (inSplit ? 'in ' + plural(inSplit, 'split') : 'in no splits') + '</span>'
         +     (net
                 ? '<b class="' + (net > 0 ? 'is-plus' : 'is-minus') + '">'
-                    + (net > 0 ? 'owed ' : 'owes ') + moneyIn(Math.abs(net), t.home || 'MYR', { round: true }) + '</b>'
+                    + (net > 0 ? 'owed ' : 'owes ') + moneyIn(Math.abs(net), t.home || 'MYR') + '</b>'
                 : '<b class="is-square">square</b>')
         +   '</div>'
         + '</div>'
@@ -3322,14 +3351,16 @@ function paintSettle(t) {
     const owed = live.reduce((n, r) => n + r.tr.amount, 0);
     const done = live.reduce((n, r) => n + Math.min(r.paid, r.tr.amount), 0);
 
+    /* Exact, like the cards under it — a summary that rounds while the rows
+       it summarises do not is a summary that appears to disagree with them. */
     set('settleNote', plural(plan.length, 'transfer') + ' · '
-        + moneyIn(done, cur, { round: true }) + ' of ' + moneyIn(owed, cur, { round: true }) + ' handed over');
+        + moneyIn(done, cur) + ' of ' + moneyIn(owed, cur) + ' handed over');
 
     html('settleList', ''
         + (owed
             ? '<div class="settle-bar"><span class="sb-track"><span class="sb-fill" style="width:'
                 + Math.round(done / owed * 100) + '%"></span></span>'
-                + '<span class="settle-left">' + moneyIn(owed - done, cur, { round: true }) + ' still to move</span></div>'
+                + '<span class="settle-left">' + moneyIn(owed - done, cur) + ' still to move</span></div>'
             : '')
         + '<div class="settle-deck">' + rows.map((r) => settleCard(r, t, cur)).join('') + '</div>');
 }
@@ -3517,7 +3548,7 @@ function renderSpend() {
 
     const all = mine(db.spend);
     const spent = all.reduce((n, x) => n + homeOf({ cost: x.amount, cur: x.cur }, t), 0);
-    set('spendNote', all.length ? plural(all.length, 'expense') + ' · ' + money(spent, { round: true }) : 'Nothing recorded yet');
+    set('spendNote', all.length ? plural(all.length, 'expense') + ' · ' + money(spent) : 'Nothing recorded yet');
 
     paintSpendSummary(t, all, spent);
     paintOwe(t);
@@ -3631,10 +3662,10 @@ function paintSpendSummary(t, all, spent) {
 
     html('spendSummary', ''
         + '<div class="spend-figures">'
-        +   figure('Spent', money(spent, { round: true }), plural(all.length, 'expense'))
-        +   figure('Budget', t.budget ? money(t.budget, { round: true }) : '—',
+        +   figure('Spent', money(spent), plural(all.length, 'expense'))
+        +   figure('Budget', t.budget ? money(t.budget) : '—',
                 t.budget ? Math.round(spent / t.budget * 100) + '% of it gone' : 'No budget set')
-        +   figure('Per person', money(Math.round(spent / Math.max(1, t.who || 1)), { round: true }),
+        +   figure('Per person', money(Math.round(spent / Math.max(1, t.who || 1))),
                 'across ' + plural(t.who || 1, 'member'))
         +   figure('Against the plan', head ? plural(head, 'stop') : '—',
                 head ? 'on the itinerary' : 'nothing planned')
@@ -3643,11 +3674,16 @@ function paintSpendSummary(t, all, spent) {
             + '<div class="spend-bar" style="' + tone(r.c) + '">'
             +   '<span class="sb-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
             +   '<span class="sb-track"><span class="sb-fill" style="width:' + Math.max(3, Math.round(r.sen / top * 100)) + '%"></span></span>'
-            +   '<span class="sb-val">' + money(r.sen, { round: true }) + '</span>'
+            +   '<span class="sb-val">' + money(r.sen) + '</span>'
             +   '<span class="sb-pct">' + Math.round(r.sen / spent * 100) + '%</span>'
             + '</div>').join('') + '</div>');
 }
 
+/* Every figure here is exact, where most of this app rounds. A budget
+   headline is a figure you glance at; a balance is a figure somebody hands
+   over. Rounding RM 12.50 to RM 13 in a column headed "needs to pay" is the
+   app being wrong about money by fifty sen, twice, and the two columns then
+   stop adding up to the total underneath them. */
 function paintOwe(t) {
     const rows = balances(t).filter((r) => r.paid || r.share);
     set('spendOweNote', rows.length ? plural(rows.length, 'person', 'people') : '');
@@ -3665,16 +3701,16 @@ function paintOwe(t) {
         + '<thead><tr><th>Person</th><th>Paid</th><th>Share</th><th>Balance</th><th></th></tr></thead><tbody>'
         + rows.sort((a, b) => b.net - a.net).map((r) => '<tr>'
             + '<td><strong' + (r.gone ? ' class="is-gone"' : '') + '>' + esc(r.person.name) + '</strong></td>'
-            + '<td>' + moneyIn(r.paid, cur, { round: true }) + '</td>'
-            + '<td>' + moneyIn(r.share, cur, { round: true }) + '</td>'
+            + '<td>' + moneyIn(r.paid, cur) + '</td>'
+            + '<td>' + moneyIn(r.share, cur) + '</td>'
             + '<td class="is-strong ' + (r.net > 0 ? 'is-plus' : (r.net < 0 ? 'is-minus' : 'is-muted')) + '">'
-            +   (r.net > 0 ? '+' : (r.net < 0 ? '−' : '')) + moneyIn(Math.abs(r.net), cur, { round: true })
+            +   (r.net > 0 ? '+' : (r.net < 0 ? '−' : '')) + moneyIn(Math.abs(r.net), cur)
             + '</td>'
             + '<td class="is-muted">'
             +   (r.net > 0 ? 'should receive' : (r.net < 0 ? 'needs to pay' : 'square'))
             + '</td></tr>').join('')
         + '<tr class="total-row"><td>Total expenses</td>'
-        +   '<td class="is-strong">' + moneyIn(spent, cur, { round: true }) + '</td>'
+        +   '<td class="is-strong">' + moneyIn(spent, cur) + '</td>'
         +   '<td colspan="3"></td></tr>'
         + '</tbody></table></div>');
 }
@@ -4776,18 +4812,18 @@ function paintBudgetHead(t) {
 
     html('budgetHead', ''
         + '<div class="budget-figures">'
-        +   figure('Budget', t.budget ? money(t.budget, { round: true }) : '—',
+        +   figure('Budget', t.budget ? money(t.budget) : '—',
                 t.budget ? 'set for the whole of it' : 'not set yet')
-        +   figure('Actual', money(spent, { round: true }),
+        +   figure('Actual', money(spent),
                 plural(mine(db.spend).length, 'expense') + ' recorded')
         +   figure(line.left < 0 ? 'Over by' : 'Remaining',
-                t.budget ? money(Math.abs(line.left), { round: true }) : '—',
+                t.budget ? money(Math.abs(line.left)) : '—',
                 t.budget ? (line.left < 0 ? 'past the budget' : 'still to spend') : 'set a budget first')
         + '</div>'
         + (t.budget ? budgetBar(line) : '')
         + '<div class="budget-aside">'
-        +   '<span><i class="bi bi-ticket-perforated"></i>' + money(held, { round: true }) + ' in bookings</span>'
-        +   '<span><i class="bi bi-calendar2-week"></i>' + money(planned, { round: true }) + ' still planned on the itinerary</span>'
+        +   '<span><i class="bi bi-ticket-perforated"></i>' + money(held) + ' in bookings</span>'
+        +   '<span><i class="bi bi-calendar2-week"></i>' + money(planned) + ' still planned on the itinerary</span>'
         + '</div>');
 }
 
@@ -4812,16 +4848,16 @@ function paintBudgetSubs(t) {
     const days = length === null ? 0 : length + 1;
 
     set('budgetTotalSub', t.budget
-        ? money(Math.round(t.budget / heads), { round: true }) + ' a head'
-            + (days ? ' · ' + money(Math.round(t.budget / days), { round: true }) + ' a day' : '')
+        ? money(Math.round(t.budget / heads)) + ' a head'
+            + (days ? ' · ' + money(Math.round(t.budget / days)) + ' a day' : '')
         : 'Set a total and it splits itself.');
 
     set('budgetHeadSub', t.headBudget
-        ? money(t.headBudget * heads, { round: true }) + ' across ' + plural(heads, 'person', 'people')
+        ? money(t.headBudget * heads) + ' across ' + plural(heads, 'person', 'people')
         : 'What one person is expected to use.');
 
     set('budgetDaySub', t.dayBudget
-        ? (days ? money(t.dayBudget * days, { round: true }) + ' across ' + plural(days, 'day') : 'No dates set')
+        ? (days ? money(t.dayBudget * days) + ' across ' + plural(days, 'day') : 'No dates set')
         : 'What one day is expected to cost.');
 }
 
@@ -4848,7 +4884,7 @@ function paintBudgetWarns(t) {
         + '<i class="bi ' + (l.state === 'over' ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill') + '"></i>'
         + '<div class="warn-say">'
         +   '<b>' + (l.state === 'over'
-                ? 'You are ' + moneyIn(-l.left, l.cur, { round: true }) + ' past your ' + esc(l.label) + ' budget.'
+                ? 'You are ' + moneyIn(-l.left, l.cur) + ' past your ' + esc(l.label) + ' budget.'
                 : 'You have spent ' + Math.round(l.pct * 100) + '% of your ' + esc(l.label) + ' budget.') + '</b>'
         +   '<span>Budget ' + moneyIn(l.budget, l.cur) + ' · Spent ' + moneyIn(l.actual, l.cur)
         +     ' · ' + (l.left < 0 ? 'Over ' + moneyIn(-l.left, l.cur) : 'Remaining ' + moneyIn(l.left, l.cur)) + '</span>'
@@ -4885,10 +4921,10 @@ function paintBudgetCats(t) {
             +   '<input type="number" min="0" step="0.01" placeholder="no budget"'
             +     ' data-cat-budget="' + esc(c.id) + '" value="' + (budget ? esc(fromSen(budget)) : '') + '">'
             + '</div>'
-            + '<span class="cb-actual' + (actual ? '' : ' is-idle') + '">' + moneyIn(actual, cur, { round: true }) + '</span>'
+            + '<span class="cb-actual' + (actual ? '' : ' is-idle') + '">' + moneyIn(actual, cur) + '</span>'
             + (budget
                 ? '<span class="cb-left ' + (line.left < 0 ? 'is-minus' : '') + '">'
-                    + (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur, { round: true }) + '</span>'
+                    + (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur) + '</span>'
                     + '<span class="bb-track cb-bar"><span class="bb-fill" style="width:'
                     + Math.min(100, line.pct * 100).toFixed(1) + '%"></span></span>'
                 : '<span class="cb-left is-idle">—</span><span class="cb-bar"></span>')
@@ -4907,7 +4943,7 @@ function paintBudgetPeople(t) {
     }
 
     set('budgetPeopleNote', t.headBudget
-        ? moneyIn(t.headBudget, cur, { round: true }) + ' each'
+        ? moneyIn(t.headBudget, cur) + ' each'
         : plural(rows.length, 'person', 'people'));
 
     html('budgetPeople', ''
@@ -4917,10 +4953,10 @@ function paintBudgetPeople(t) {
             const line = budgetLine(r.person.name, t.headBudget || 0, r.share);
             return '<tr>'
                 + '<td><strong' + (r.gone ? ' class="is-gone"' : '') + '>' + esc(r.person.name) + '</strong></td>'
-                + '<td>' + (t.headBudget ? moneyIn(t.headBudget, cur, { round: true }) : '—') + '</td>'
-                + '<td class="is-strong">' + moneyIn(r.share, cur, { round: true }) + '</td>'
+                + '<td>' + (t.headBudget ? moneyIn(t.headBudget, cur) : '—') + '</td>'
+                + '<td class="is-strong">' + moneyIn(r.share, cur) + '</td>'
                 + '<td class="' + (line.left < 0 ? 'is-minus' : '') + '">'
-                +   (t.headBudget ? (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur, { round: true }) : '—')
+                +   (t.headBudget ? (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur) : '—')
                 + '</td>'
                 + '<td>' + (t.headBudget ? budgetTag(line) : '<span class="is-muted">no budget set</span>') + '</td>'
                 + '</tr>';
@@ -4941,7 +4977,7 @@ function paintBudgetDays(t) {
     const spent = days.reduce((n, d) => n + d.spent, 0);
     const live = days.filter((d) => d.spent).length;
     set('budgetDaysNote', live
-        ? money(Math.round(spent / live), { round: true }) + ' a day on average, over ' + plural(live, 'day')
+        ? money(Math.round(spent / live)) + ' a day on average, over ' + plural(live, 'day')
         : plural(days.length, 'day'));
 
     html('budgetDays', ''
@@ -4952,16 +4988,16 @@ function paintBudgetDays(t) {
             return '<tr' + (d.date === today() ? ' class="is-current"' : '') + '>'
                 + '<td><strong>' + fmtDay(d.date) + '</strong>'
                 +   '<small>' + (d.n ? plural(d.n, 'expense') : 'nothing recorded') + '</small></td>'
-                + '<td>' + (t.dayBudget ? moneyIn(t.dayBudget, cur, { round: true }) : '—') + '</td>'
-                + '<td class="' + (d.spent ? 'is-strong' : 'is-muted') + '">' + moneyIn(d.spent, cur, { round: true }) + '</td>'
+                + '<td>' + (t.dayBudget ? moneyIn(t.dayBudget, cur) : '—') + '</td>'
+                + '<td class="' + (d.spent ? 'is-strong' : 'is-muted') + '">' + moneyIn(d.spent, cur) + '</td>'
                 + '<td class="' + (line.left < 0 ? 'is-minus' : '') + '">'
-                +   (t.dayBudget ? (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur, { round: true }) : '—')
+                +   (t.dayBudget ? (line.left < 0 ? '−' : '') + moneyIn(Math.abs(line.left), cur) : '—')
                 + '</td>'
                 + '<td>' + (t.dayBudget && d.spent ? budgetTag(line) : '') + '</td>'
                 + '</tr>';
         }).join('')
         + '<tr class="total-row"><td>All of it</td><td></td>'
-        +   '<td class="is-strong">' + moneyIn(spent, cur, { round: true }) + '</td><td colspan="2"></td></tr>'
+        +   '<td class="is-strong">' + moneyIn(spent, cur) + '</td><td colspan="2"></td></tr>'
         + '</tbody></table></div>');
 }
 
@@ -6783,7 +6819,7 @@ function paintLadder(rate, from, to) {
         + steps.map((n) => {
             const sen = toSen(n);
             const got = convDir === 'out' ? Math.round(sen * rate) : Math.round(sen / rate);
-            return '<tr><td>' + moneyIn(sen, from, { round: CUR[from].dp === 0 }) + '</td>'
+            return '<tr><td>' + moneyIn(sen, from) + '</td>'
                 + '<td>' + moneyIn(got, to) + '</td></tr>';
         }).join('')
         + '</tbody>');
@@ -6854,6 +6890,7 @@ function start() {
     paintRecBar();
     paintCounts();
     calCursor = today();
+    focusNext();
     clearTripForm();
     clearStopForm();
     clearBookForm();

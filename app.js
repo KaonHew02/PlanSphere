@@ -1565,13 +1565,25 @@ const KIN = {
 const KIN_ORDER = ['trip', 'event', 'activity'];
 const kinOf = (k) => KIN[k] || KIN.trip;
 
-/* The calendar files everything under a category, and these records are
-   not filed by hand. The system category is the fallback because it is
-   the one that cannot be deleted — an event drawn in the Event colour is
-   better, but not at the price of a record that draws as nothing. */
+/* Which category the calendar draws a record in.
+
+   It used to be the kind and only the kind: every trip in the Trip colour,
+   every event in Event, every activity in Personal — so a company activity
+   and a badminton game were the same colour and no amount of category
+   editing could separate them. The kind is the default now rather than the
+   answer, and the form carries a field to say otherwise.
+
+   The fallback is the system category because it is the one that cannot be
+   deleted — an event drawn in the Event colour is better, but not at the
+   price of a record that draws as nothing. */
 function catForKind(k) {
     const want = kinOf(k).cat;
     return db.cats.some((c) => c.id === want) ? want : 'trip';
+}
+
+function catOfTrip(t) {
+    if (t && t.cat && db.cats.some((c) => c.id === t.cat)) return t.cat;
+    return catForKind(t && t.kind);
 }
 
 /* --------------------------------------------------------------------
@@ -1838,6 +1850,7 @@ function openTripForm(kind, id) {
 
     fillTypeSelect(kin.scope, t ? t.type : '');
     fillStatusSelect(t ? liveStatus(t) : 'planning');
+    fillTripCatSelect(t ? catOfTrip(t) : catForKind(newKind));
     fillCurSelect($('tripHome'), t ? (t.home || 'MYR') : 'MYR');
     fillCountrySelect($('tripCountry'), t ? (t.country || '') : '');
 
@@ -1890,6 +1903,7 @@ function saveTrip() {
         name,
         type: $('tripType').value || '',
         status: $('tripStatus').value || 'planning',
+        cat: $('tripCat').value || '',
         where: $('tripWhere').value.trim(),
         desc: $('tripDesc').value.trim(),
         cover: coverHeld,
@@ -1920,6 +1934,17 @@ function fillTypeSelect(scope, selected) {
     el.innerHTML = '<option value="">No type</option>'
         + list.map((ty) => '<option value="' + esc(ty.id) + '">' + esc(ty.label) + '</option>').join('');
     el.value = list.some((ty) => ty.id === selected) ? selected : '';
+}
+
+/** Every category except the holiday feed, which files itself and would
+    put a trip in among the public holidays. */
+function fillTripCatSelect(selected) {
+    const el = $('tripCat');
+    if (!el) return;
+    const list = db.cats.filter((c) => c.id !== 'holiday');
+    el.innerHTML = list.map((c) =>
+        '<option value="' + esc(c.id) + '">' + esc(c.mark) + '  ' + esc(c.label) + '</option>').join('');
+    el.value = list.some((c) => c.id === selected) ? selected : (list[0] ? list[0].id : '');
 }
 
 function fillStatusSelect(selected) {
@@ -5661,7 +5686,7 @@ function calItems() {
         if (!t.from) return;
         const kin = kinOf(t.kind);
         out.push({
-            src: 'trip', id: t.id, cat: catForKind(t.kind),
+            src: 'trip', id: t.id, cat: catOfTrip(t),
             title: t.name || 'Untitled ' + kin.label.toLowerCase(),
             date: t.from, until: (kin.span && t.to) || t.from, span: true,
             where: t.where || '', movable: false, trip: t.id,

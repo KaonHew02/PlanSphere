@@ -1188,41 +1188,54 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     .card-note.is-end { margin-left: 0; }
 }
 
-/* On a deck the footer has lost its two buttons, so "Open" stops being a
-   caption beside them and becomes the whole row. */
-.rec-deck .tc-foot { justify-content: flex-start; }
-
-.rec-deck .trip-card { cursor: pointer; }
-
 /* ==========================================================================
-   Pick one, then the screen
+   The record bar
 
-   Six screens are about one record, and each opens on a deck of tiles. Two
-   rules do the whole switch: in deck mode nothing but the deck is on screen,
-   and out of deck mode the deck is put away. Every other card keeps managing
-   its own `hidden` exactly as it did — these never touch it.
+   What is open, and the six questions you can ask about it. It sits above
+   every module rather than inside one, because the module it belongs to is
+   whichever of the six is on screen.
    ========================================================================== */
-.module.is-deck > .stack > .card:not(.rec-deck) { display: none; }
-.module:not(.is-deck) > .stack > .rec-deck { display: none; }
-
-/* The strip that replaces the deck: where you are, and the way back. */
-.rec-head { padding: 12px 18px; }
-
-.rec-head-row {
+.rec-bar {
     display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
 }
 
-.rec-head-name {
-    font-size: 16px;
+.rec-bar-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.rec-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .12s ease, color .12s ease;
+}
+
+.rec-back:hover { border-color: var(--azure); color: var(--azure-ink); }
+
+.rec-bar-name {
+    font-size: 17px;
     font-weight: 700;
     color: var(--ink);
     overflow-wrap: anywhere;
 }
 
-.rec-head-when {
+.rec-bar-when {
     margin-left: auto;
     font-size: 12.5px;
     font-weight: 600;
@@ -1231,9 +1244,59 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     white-space: nowrap;
 }
 
+/* The six tabs. Underlined rather than filled: the sidebar is already a
+   column of filled pills, and a second set would read as a second sidebar
+   rather than as what lives inside the first one's choice. */
+.rec-subs {
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    border-top: 1px solid var(--row-line);
+    padding-top: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.rec-subs button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 14px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color .12s ease, border-color .12s ease;
+}
+
+.rec-subs button i { font-size: 14px; }
+.rec-subs button:hover { color: var(--azure-ink); }
+
+.rec-subs button.is-on {
+    color: var(--azure-ink);
+    border-bottom-color: var(--azure);
+}
+
+.rec-subs .count {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--canvas);
+    font-size: 10.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.rec-subs button.is-on .count { background: var(--azure-soft); color: var(--azure-ink); }
+
 @media (max-width: 700px) {
-    .rec-head-row > .ghost-btn { width: 100%; justify-content: center; }
-    .rec-head-when { margin-left: 0; }
+    .rec-bar { padding: 14px 16px; gap: 10px; }
+    .rec-back { width: 100%; justify-content: center; }
+    .rec-bar-when { margin-left: 0; }
+    .rec-subs button { padding: 9px 11px; font-size: 12.5px; }
 }
 
 /* ==========================================================================

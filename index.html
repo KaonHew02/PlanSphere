@@ -38,33 +38,16 @@
             <button type="button" data-module="trips">
                 <i class="bi bi-suitcase-lg-fill"></i><span>Activities</span><em class="count" id="countTrips" hidden></em>
             </button>
-            <button type="button" data-module="plan">
-                <i class="bi bi-calendar2-week-fill"></i><span>Itinerary</span><em class="count" id="countStops" hidden></em>
-            </button>
-            <button type="button" data-module="spend">
-                <i class="bi bi-cash-coin"></i><span>Expenses</span><em class="count" id="countSpend" hidden></em>
-            </button>
-            <button type="button" data-module="budget">
-                <i class="bi bi-wallet2"></i><span>Budget</span>
-            </button>
-            <button type="button" data-module="sum">
-                <i class="bi bi-bar-chart-fill"></i><span>Summary</span>
-            </button>
 
-            <!-- Below the rule: the three screens that answer to a
-                 numbered module rather than being one. Bookings feed the
-                 Expenses ledger, Convert is a calculator, and Packing is
-                 a list. -->
+            <!-- Below the rule: the one screen that belongs to nobody.
+                 The other six — itinerary, expenses, budget, summary,
+                 bookings, packing — are not screens you go to, they are
+                 six things you can ask about one record, so they live
+                 inside a record rather than beside it in this column. -->
             <span class="tab-rule"></span>
 
-            <button type="button" data-module="book">
-                <i class="bi bi-ticket-perforated-fill"></i><span>Bookings</span><em class="count" id="countBookings" hidden></em>
-            </button>
             <button type="button" data-module="conv">
                 <i class="bi bi-currency-exchange"></i><span>Convert</span>
-            </button>
-            <button type="button" data-module="pack">
-                <i class="bi bi-bag-check-fill"></i><span>Packing</span><em class="count" id="countPack" hidden></em>
             </button>
         </nav>
     </aside>
@@ -135,6 +118,39 @@
     </div>
 
     <main class="main">
+
+        <!-- What is open, and the six questions you can ask about it. Shown
+             only while a record is open; hidden the rest of the time, when
+             the Activities shelf is the thing on screen. -->
+        <div class="rec-bar" id="recBar" hidden>
+            <div class="rec-bar-top">
+                <button type="button" class="rec-back" data-rec-back="1">
+                    <i class="bi bi-arrow-left"></i><span>All activities</span>
+                </button>
+                <span class="rec-bar-name" id="recBarName"></span>
+                <span class="rec-bar-when" id="recBarWhen"></span>
+            </div>
+            <nav class="rec-subs" id="recSubs">
+                <button type="button" data-sub="plan">
+                    <i class="bi bi-calendar2-week-fill"></i><span>Itinerary</span><em class="count" id="countStops" hidden></em>
+                </button>
+                <button type="button" data-sub="spend">
+                    <i class="bi bi-cash-coin"></i><span>Expenses</span><em class="count" id="countSpend" hidden></em>
+                </button>
+                <button type="button" data-sub="budget">
+                    <i class="bi bi-wallet2"></i><span>Budget</span>
+                </button>
+                <button type="button" data-sub="sum">
+                    <i class="bi bi-bar-chart-fill"></i><span>Summary</span>
+                </button>
+                <button type="button" data-sub="book">
+                    <i class="bi bi-ticket-perforated-fill"></i><span>Bookings</span><em class="count" id="countBookings" hidden></em>
+                </button>
+                <button type="button" data-sub="pack">
+                    <i class="bi bi-bag-check-fill"></i><span>Packing</span><em class="count" id="countPack" hidden></em>
+                </button>
+            </nav>
+        </div>
 
         <!-- ==============================================================
              MODULE 02 · CALENDAR & TIMELINE
@@ -301,28 +317,6 @@
         <section class="module" id="module-sum" hidden>
 
             <div class="stack">
-
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="sumRecDeck">
-                    <div class="card-head">
-                        <h2 id="sumRecDeckTitle">Open one to see its summary</h2>
-                        <span class="card-note" id="sumRecDeckNote"></span>
-                    </div>
-                    <div id="sumRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="sumRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="sumRecName"></span>
-                        <span class="rec-head-when" id="sumRecWhen"></span>
-                    </div>
-                </section>
 
 
                 <section class="card">
@@ -616,28 +610,6 @@
 
             <div class="stack">
 
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="planRecDeck">
-                    <div class="card-head">
-                        <h2 id="planRecDeckTitle">Open one to see its itinerary</h2>
-                        <span class="card-note" id="planRecDeckNote"></span>
-                    </div>
-                    <div id="planRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="planRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="planRecName"></span>
-                        <span class="rec-head-when" id="planRecWhen"></span>
-                    </div>
-                </section>
-
 
                 <section class="card is-bar">
                     <div class="bar-row">
@@ -783,28 +755,6 @@
 
             <div class="stack">
 
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="bookRecDeck">
-                    <div class="card-head">
-                        <h2 id="bookRecDeckTitle">Open one to see its bookings</h2>
-                        <span class="card-note" id="bookRecDeckNote"></span>
-                    </div>
-                    <div id="bookRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="bookRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="bookRecName"></span>
-                        <span class="rec-head-when" id="bookRecWhen"></span>
-                    </div>
-                </section>
-
 
                 <section class="card">
                     <div class="card-head">
@@ -885,28 +835,6 @@
         <section class="module" id="module-spend" hidden>
 
             <div class="stack">
-
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="spendRecDeck">
-                    <div class="card-head">
-                        <h2 id="spendRecDeckTitle">Open one to see its expenses</h2>
-                        <span class="card-note" id="spendRecDeckNote"></span>
-                    </div>
-                    <div id="spendRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="spendRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="spendRecName"></span>
-                        <span class="rec-head-when" id="spendRecWhen"></span>
-                    </div>
-                </section>
 
 
                 <section class="card is-bar">
@@ -1383,28 +1311,6 @@
 
             <div class="stack">
 
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="budgetRecDeck">
-                    <div class="card-head">
-                        <h2 id="budgetRecDeckTitle">Open one to see its budget</h2>
-                        <span class="card-note" id="budgetRecDeckNote"></span>
-                    </div>
-                    <div id="budgetRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="budgetRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="budgetRecName"></span>
-                        <span class="rec-head-when" id="budgetRecWhen"></span>
-                    </div>
-                </section>
-
 
                 <section class="card">
                     <div class="card-head">
@@ -1589,28 +1495,6 @@
         <section class="module" id="module-pack" hidden>
 
             <div class="stack">
-
-                <!-- Pick one, then the screen. The deck is the Activities
-                     shelf in miniature; the strip under it is what replaces
-                     it once something is open. Both are painted from the
-                     store by paintDrill(). -->
-                <section class="card rec-deck" id="packRecDeck">
-                    <div class="card-head">
-                        <h2 id="packRecDeckTitle">Open one to see its packing list</h2>
-                        <span class="card-note" id="packRecDeckNote"></span>
-                    </div>
-                    <div id="packRecDeckList"></div>
-                </section>
-
-                <section class="card is-bar rec-head" id="packRecHead">
-                    <div class="rec-head-row">
-                        <button type="button" class="ghost-btn" data-rec-back="1">
-                            <i class="bi bi-arrow-left"></i>Back
-                        </button>
-                        <span class="rec-head-name" id="packRecName"></span>
-                        <span class="rec-head-when" id="packRecWhen"></span>
-                    </div>
-                </section>
 
 
                 <section class="card">

@@ -738,109 +738,108 @@ let live = 'dash';
 
 function showModule(key) {
     if (!MODULES[key]) return;
-    live = key;
+    /* The six sub-screens are not sidebar destinations, so arriving at one
+       means arriving at the record that owns it. */
+    if (SUBS[key]) { subTab = key; live = 'trips'; } else { live = key; }
 
+    /* Leaving Activities closes whatever was open in it: coming back to the
+       Calendar and then to Activities should show the shelf, not the middle
+       of somebody's budget. */
+    if (live !== 'trips') openRec = false;
+
+    const shown = liveSection();
     Object.keys(MODULES).forEach((id) => {
         const section = $('module-' + id);
-        if (section) section.hidden = id !== key;
+        if (section) section.hidden = id !== shown;
     });
 
     document.querySelectorAll('#tabs button').forEach((btn) => {
-        btn.classList.toggle('is-on', btn.dataset.module === key);
+        btn.classList.toggle('is-on', btn.dataset.module === live);
     });
 
-    MODULES[key]();
+    paintRecBar();
+    MODULES[shown]();
 }
 
 /** Whatever is on screen, plus the two things that are always on screen. */
 function repaint() {
-    paintDrill();
+    paintRecBar();
     paintCounts();
-    MODULES[live]();
+    MODULES[liveSection()]();
 }
 
 /* ====================================================================
-   PICK ONE, THEN THE SCREEN
+   A RECORD, AND THE SIX QUESTIONS ABOUT IT
 
-   Six screens are about one record: the itinerary, the expenses, the
-   budget, the summary, the bookings and the packing list. They used to
-   answer to a <select> in the top bar labelled "Viewing", then to a bar
-   of chips, and both had the same problem — a control that names the
-   record is not the same as arriving at the record. You read RM 6,000
-   and had to go looking for whose it was.
+   The itinerary, the expenses, the budget, the summary, the bookings and
+   the packing list are not six screens. They are six things you can ask
+   about one trip, and they have no meaning at all until a trip is named
+   — which is why they spent three revisions of this app failing to say
+   whose figures they were showing, first from a <select> in the top bar,
+   then from a bar of chips.
 
-   So each of the six opens on a deck of the same tiles the Activities
-   shelf draws, and you pick one. The deck is put away, a strip carrying
-   the name and the dates takes its place, and the screen underneath is
-   about that one thing until Back is pressed.
+   So they came out of the sidebar. The sidebar now holds the four things
+   that stand on their own — Home, Calendar, Activities, Convert — and
+   the six live inside a record: open one from the shelf and they appear
+   as its tabs, with a way back out.
 
-   `openRec` is shared across the six on purpose: having opened Mahjong
-   on the Itinerary, walking to Expenses should still be Mahjong. What
-   Back closes is the record, not the screen.
+   The bar is the first thing in <main> rather than inside any module,
+   because the module it belongs to is whichever one is on screen, and
+   tabs printed underneath their own content are not tabs.
    ==================================================================== */
-const DRILL = {
-    plan:   'itinerary',
-    spend:  'expenses',
-    budget: 'budget',
-    sum:    'summary',
-    book:   'bookings',
-    pack:   'packing list',
+const SUBS = {
+    plan:   'Itinerary',
+    spend:  'Expenses',
+    budget: 'Budget',
+    sum:    'Summary',
+    book:   'Bookings',
+    pack:   'Packing',
 };
 
-const DRILL_KEYS = Object.keys(DRILL);
-
 let openRec = false;
+let subTab = 'plan';
 
-/** Opening from anywhere — a tile on a deck, Open on the shelf, a stop
-    clicked on the calendar — is the same act. */
-function openTrip(id) {
+/** Opening from anywhere — a tile on the shelf, a stop clicked on the
+    calendar — is the same act. */
+function openTrip(id, sub) {
     db.current = id;
     openRec = true;
+    if (sub && SUBS[sub]) subTab = sub;
     save();
     clearStopForm();
     clearBookForm();
-    repaint();
+    showModule('trips');
 }
 
-function paintDrill() {
+function closeRec() {
+    openRec = false;
+    showModule('trips');
+}
+
+/** Which section is actually on screen: a sub-screen while a record is
+    open, and whatever the sidebar last chose when it is not. */
+const liveSection = () => (openRec && trip() ? subTab : live);
+
+function paintRecBar() {
     const t = trip();
-    const open = openRec && !!t;
+    const open = openRec && !!t && live === 'trips';
+    const bar = $('recBar');
+    if (bar) bar.hidden = !open;
+    if (!open) return;
 
-    /* Painted once and handed to all six: the same deck on every screen,
-       because it is the same question on every screen. */
-    const tiles = db.trips.length
-        ? '<div class="trip-deck">' + db.trips.slice().sort(sortNearest)
-            .map((row) => tripCard(row, { acts: false })).join('') + '</div>'
-        : null;
+    const kin = kinOf(t.kind);
+    set('recBarName', kin.mark + '  ' + (t.name || 'Untitled ' + kin.label.toLowerCase()));
+    set('recBarWhen', t.from
+        ? (kin.span && t.to && t.to !== t.from ? fmtRange(t.from, t.to) : fmtNum(t.from))
+        : 'No dates yet');
 
-    DRILL_KEYS.forEach((k) => {
-        const sec = $('module-' + k);
-        if (!sec) return;
-        sec.classList.toggle('is-deck', !open);
-
-        set(k + 'RecDeckTitle', db.trips.length
-            ? 'Open one to see its ' + DRILL[k]
-            : 'Nothing planned yet');
-        set(k + 'RecDeckNote', db.trips.length ? plural(db.trips.length, 'record') : '');
-        html(k + 'RecDeckList', tiles || emptyState('bi-suitcase',
-            'Nothing planned yet',
-            'Create a trip, an event or an activity on the Activities screen first.'));
-        if (!open) return;
-
-        const kin = kinOf(t.kind);
-        set(k + 'RecName', kin.mark + '  ' + (t.name || 'Untitled ' + kin.label.toLowerCase()));
-        set(k + 'RecWhen', t.from
-            ? (kin.span && t.to && t.to !== t.from ? fmtRange(t.from, t.to) : fmtNum(t.from))
-            : 'No dates yet');
+    document.querySelectorAll('#recSubs button').forEach((btn) => {
+        btn.classList.toggle('is-on', btn.dataset.sub === subTab);
     });
 
-    paintDrillTitles(t, open);
-}
-
-/** The heading says it as well as the strip does, because a heading is what
-    gets read on the way down the page. */
-function paintDrillTitles(t, open) {
-    const tail = open && t ? ' — ' + (t.name || 'Untitled') : '';
+    /* The heading repeats the name, because a heading is what gets read on
+       the way down a long page and the bar has scrolled off by then. */
+    const tail = ' — ' + (t.name || 'Untitled');
     [['planTitle', 'The plan'], ['spendTitle', 'Expenses'],
      ['budgetTitle', 'Where the budget stands'], ['sumTitle', 'At a glance']]
         .forEach(([id, base]) => { if ($(id)) set(id, base + tail); });
@@ -1526,11 +1525,7 @@ function renderTrips() {
    four figures that decide whether you open it. A table could hold the
    same fields but would ask you to read a grid to answer "which one is
    this" — the picture answers it before the words are read. */
-/* `acts` is off for the tiles on the six drill-in decks: editing and
-   deleting a record belong to the shelf that owns it, and a trash can on
-   the Budget screen is a trash can somebody presses by accident. */
-function tripCard(t, opts) {
-    const acts = !opts || opts.acts !== false;
+function tripCard(t) {
     const kin = kinOf(t.kind);
     const st = statusOf(liveStatus(t));
     const cur = t.home || 'MYR';
@@ -1581,10 +1576,8 @@ function tripCard(t, opts) {
 
         + '<div class="tc-foot">'
         +   '<span class="tc-open">' + (t.id === db.current && openRec ? 'Open now' : 'Open') + '</span>'
-        +   (acts
-            ? '<button type="button" class="row-x is-edit" data-edit-trip="' + esc(t.id) + '" title="Edit"><i class="bi bi-pencil"></i></button>'
-                + '<button type="button" class="row-x" data-drop-trip="' + esc(t.id) + '" title="Delete"><i class="bi bi-trash3"></i></button>'
-            : '')
+        +   '<button type="button" class="row-x is-edit" data-edit-trip="' + esc(t.id) + '" title="Edit"><i class="bi bi-pencil"></i></button>'
+        +   '<button type="button" class="row-x" data-drop-trip="' + esc(t.id) + '" title="Delete"><i class="bi bi-trash3"></i></button>'
         + '</div>'
         + '</article>';
 }
@@ -4626,7 +4619,7 @@ function renderBudget() {
     }
 
     /* The title carries the record's name and is written by
-       paintDrillTitles(), so it is not rewritten here. */
+       paintRecBar(), so it is not rewritten here. */
     set('budgetCurTag', 'in ' + (t.home || 'MYR'));
     paintRates(t);
 
@@ -6170,14 +6163,7 @@ function openItem(key) {
     /* A stop or a booking belongs to a trip that may not be the one on the
        top bar. Switch to it first, or the module opens showing someone
        else's plan. */
-    if (it.trip) {
-        db.current = it.trip;
-        openRec = true;
-        save();
-        paintDrill();
-        clearStopForm();
-        clearBookForm();
-    }
+    if (it.trip) return openTrip(it.trip, SOURCES[it.src].module);
     showModule(SOURCES[it.src].module);
 }
 
@@ -6729,7 +6715,7 @@ function start() {
     holLoad();
     loadNav();
     paintStamp();
-    paintDrill();
+    paintRecBar();
     paintCounts();
     calCursor = today();
     clearTripForm();
@@ -7343,6 +7329,7 @@ function start() {
                     if (db.current === dropT) {
                         db.current = db.trips.length ? db.trips[0].id : null;
                         openRec = false;
+                        subTab = 'plan';
                     }
                     save();
                     clearTripForm();
@@ -7356,9 +7343,12 @@ function start() {
         const dropTy = hit('data-drop-type');
         if (dropTy) return dropType(dropTy);
 
-        if (hit('data-rec-back')) {
-            openRec = false;
-            return repaint();
+        if (hit('data-rec-back')) return closeRec();
+
+        const sub = hit('data-sub');
+        if (sub) {
+            subTab = sub;
+            return showModule('trips');
         }
 
         const open = hit('data-open-trip');

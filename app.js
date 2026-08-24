@@ -416,7 +416,6 @@ function load() {
     db.trips.forEach((t) => { if (!Array.isArray(t.people)) t.people = []; });
 
     /* Stops predate their status, and one that says nothing is still on. */
-    db.stops.forEach((s) => { if (!s.status) s.status = 'planned'; });
 
     if (!db.homeCountry) db.homeCountry = 'MY';
     if (!db.trips.some((t) => t.id === db.current)) db.current = db.trips.length ? db.trips[0].id : null;
@@ -724,6 +723,32 @@ function foldSet(key, shut) {
     fields are filled in behind a closed lid. */
 function unfold(key) {
     if (isShut(key)) foldSet(key, false);
+}
+
+/* --------------------------------------------------------------------
+   Clear, and Cancel
+
+   Four of these forms stand open on their screen rather than appearing
+   when you press Add — the stop, the booking, the calendar entry and the
+   packing item. On those, the button beside the heading only ever showed
+   itself while you were editing something, where it meant "stop editing
+   this one". Typing three fields into a fresh form and changing your
+   mind left you deleting them by hand.
+
+   So it is always there, and it says which of the two things it is
+   about to do. Both are the same call — the form's own clear function
+   returns it to adding nothing, which is exactly what cancelling an edit
+   means too.
+   -------------------------------------------------------------------- */
+function setClearBtn(id, editing) {
+    const btn = $(id);
+    if (!btn) return;
+    btn.hidden = false;
+    btn.innerHTML = '<i class="bi ' + (editing ? 'bi-x-lg' : 'bi-eraser') + '"></i>'
+        + (editing ? 'Cancel' : 'Clear');
+    btn.title = editing
+        ? 'Stop editing this one and go back to adding'
+        : 'Empty the fields';
 }
 
 /* ====================================================================
@@ -1295,7 +1320,7 @@ function paintSumPeople(t) {
 /** The next few things due, whether that is tomorrow or in a month. */
 function paintNext(stops, now) {
     const soon = stops
-        .filter((s) => s.date >= now && stopIsOn(s))
+        .filter((s) => s.date >= now)
         .sort(sortStops)
         .slice(0, 5);
 
@@ -2069,7 +2094,6 @@ function paintPlanFilter() {
    ==================================================================== */
 let editStop = null;
 let planFilter = 'all';
-let planState = 'live';
 let attHeld = null;
 
 /* --------------------------------------------------------------------
@@ -2081,18 +2105,6 @@ let attHeld = null;
    day's estimate is what the day is expected to cost, and a cancelled
    stop costs nothing.
    -------------------------------------------------------------------- */
-const STOP_STATUS = {
-    planned:   { label: 'Planned',     tag: 'is-azure', counts: true },
-    doing:     { label: 'In progress', tag: 'is-node',  counts: true },
-    done:      { label: 'Completed',   tag: 'is-green', counts: true },
-    cancelled: { label: 'Cancelled',   tag: 'is-red',   counts: false },
-    skipped:   { label: 'Skipped',     tag: 'is-muted', counts: false },
-};
-
-const STOP_STATUS_ORDER = ['planned', 'doing', 'done', 'cancelled', 'skipped'];
-const stopStatusOf = (s) => STOP_STATUS[s] || STOP_STATUS.planned;
-const stopIsOn = (s) => stopStatusOf(s.status).counts;
-
 /* --------------------------------------------------------------------
    The clock
 
@@ -2211,12 +2223,10 @@ function renderPlan() {
 
     const all = mine(db.stops);
     const byKind = planFilter === 'all' ? all : all.filter((s) => s.kind === planFilter);
-    const stops = planState === 'all' ? byKind : byKind.filter(stopIsOn);
-    const off = byKind.length - stops.length;
+    const stops = byKind;
 
     set('planNote', plural(stops.length, 'stop')
-        + (planFilter === 'all' ? '' : ' · ' + kindOf(planFilter).label)
-        + (off ? ' · ' + off + ' off' : ''));
+        + (planFilter === 'all' ? '' : ' · ' + kindOf(planFilter).label));
 
     /* Every day between the dates gets a heading whether or not anything is
        planned in it — an empty day is information, and it is where the next
@@ -2238,9 +2248,8 @@ function renderPlan() {
     const now = today();
     html('planDays', days.map((date) => {
         const list = stops.filter((s) => s.date === date).sort(sortStops);
-        const on = list.filter(stopIsOn);
-        const est = on.reduce((n, s) => n + estOf(s, t), 0);
-        const act = on.reduce((n, s) => { const a = actualOf(s, t); return n + (a ? a.sen : 0); }, 0);
+        const est = list.reduce((n, s) => n + estOf(s, t), 0);
+        const act = list.reduce((n, s) => { const a = actualOf(s, t); return n + (a ? a.sen : 0); }, 0);
         const inRange = t.from && date >= t.from && date <= t.to;
         const n = inRange ? daysBetween(t.from, date) + 1 : null;
         const pins = notesOn(date);
@@ -2271,7 +2280,6 @@ function renderPlan() {
 }
 
 function stopRow(s, now, t) {
-    const st = stopStatusOf(s.status);
     const mins = stopRun(s);
     const act = actualOf(s, t);
     const est = estOf(s, t);
@@ -2287,14 +2295,13 @@ function stopRow(s, now, t) {
     }
 
     const chips = [
-        '<span class="tag ' + st.tag + '">' + esc(st.label) + '</span>',
         s.note ? '<span class="stop-chip" title="' + esc(s.note) + '"><i class="bi bi-sticky"></i>Note</span>' : '',
         s.att ? '<button type="button" class="stop-chip is-link" data-open-att="' + esc(s.id) + '">'
             + '<i class="bi bi-paperclip"></i>' + esc(s.att.name) + '</button>' : '',
         act && act.from ? '<span class="stop-chip"><i class="bi bi-receipt"></i>' + esc(act.label || 'Expense record') + '</span>' : '',
     ].filter(Boolean).join('');
 
-    return '<div class="stop' + (s.date === now ? ' is-now' : '') + (stopIsOn(s) ? '' : ' is-off') + '">'
+    return '<div class="stop' + (s.date === now ? ' is-now' : '') + '">'
         + '<span class="stop-clock">'
         +   '<b class="' + (s.time ? '' : 'is-none') + '">' + (s.time ? fmtTime(s.time) : 'Any time') + '</b>'
         +   (s.end ? '<small>to ' + fmtTime(s.end) + '</small>' : '')
@@ -2339,7 +2346,6 @@ function saveStop() {
         time: $('stopTime').value,
         end: $('stopTime').value ? $('stopEnd').value : '',
         kind: $('stopKind').value,
-        status: $('stopStatus').value || 'planned',
         title,
         where: $('stopWhere').value.trim(),
         desc: $('stopDesc').value.trim(),
@@ -2380,7 +2386,6 @@ function clearStopForm() {
         .forEach((id) => { $(id).value = ''; });
     $('stopDate').value = t ? t.from : '';
     fillKindSelect($('stopKind'), 'do');
-    fillStopStatus('planned');
     fillCurSelect($('stopCur'), homeCur());
     fillCurSelect($('stopActualCur'), homeCur());
     fillStopSources('');
@@ -2388,7 +2393,7 @@ function clearStopForm() {
     paintStopClock();
     set('stopFormTitle', 'Add a stop');
     set('stopSaveLabel', 'Add stop');
-    $('stopCancel').hidden = true;
+    setClearBtn('stopCancel', false);
 }
 
 function openStopEdit(id) {
@@ -2406,7 +2411,6 @@ function openStopEdit(id) {
     $('stopNote').value = s.note || '';
     $('stopCost').value = s.cost ? fromSen(s.cost) : '';
     $('stopActual').value = s.actual ? fromSen(s.actual) : '';
-    fillStopStatus(s.status);
     fillCurSelect($('stopCur'), s.cur || homeCur());
     fillCurSelect($('stopActualCur'), s.actualCur || homeCur());
     fillStopSources(s.from ? s.from : (s.actual ? 'typed' : ''));
@@ -2415,17 +2419,9 @@ function openStopEdit(id) {
     paintStopClock();
     set('stopFormTitle', 'Edit stop');
     set('stopSaveLabel', 'Save changes');
-    $('stopCancel').hidden = false;
+    setClearBtn('stopCancel', true);
     $('stopTitle').focus();
     $('stopTitle').scrollIntoView({ block: 'center', behavior: 'smooth' });
-}
-
-function fillStopStatus(selected) {
-    const el = $('stopStatus');
-    if (!el) return;
-    el.innerHTML = STOP_STATUS_ORDER
-        .map((k) => '<option value="' + k + '">' + esc(STOP_STATUS[k].label) + '</option>').join('');
-    el.value = STOP_STATUS[selected] ? selected : 'planned';
 }
 
 /** The expense records this trip has, for the actual to be read from. */
@@ -2979,7 +2975,7 @@ function clearBookForm() {
     fillCurSelect($('bookCur'), homeCur());
     set('bookFormTitle', 'Add a booking');
     set('bookSaveLabel', 'Add booking');
-    $('bookCancel').hidden = true;
+    setClearBtn('bookCancel', false);
 }
 
 function openBookEdit(id) {
@@ -2997,7 +2993,7 @@ function openBookEdit(id) {
     $('bookRef').value = b.ref || '';
     set('bookFormTitle', 'Edit booking');
     set('bookSaveLabel', 'Save changes');
-    $('bookCancel').hidden = false;
+    setClearBtn('bookCancel', true);
     $('bookTitle').focus();
     $('bookTitle').scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
@@ -4630,7 +4626,7 @@ function spentOf(t) {
 
 /** What the plan still expects to cost, which is not the same question. */
 function plannedOf(t) {
-    return mine(db.stops).filter(stopIsOn).reduce((n, s) => n + homeOf(s, t), 0);
+    return mine(db.stops).reduce((n, s) => n + homeOf(s, t), 0);
 }
 
 /** A budget line: what was meant, what went, and what that means. */
@@ -4967,7 +4963,7 @@ function paintBudgetLedger(t) {
         when: b.date, what: b.title, from: STATUS[b.status].label + ' booking', firm: b.status === 'paid',
         sen: homeOf(b, t), raw: b.cost, cur: b.cur,
         mark: '', label: kindOf(b.kind).label,
-    }))).concat(mine(db.stops).filter((s) => s.cost && stopIsOn(s) && !s.from).map((s) => ({
+    }))).concat(mine(db.stops).filter((s) => s.cost && !s.from).map((s) => ({
         when: s.date, what: s.title, from: 'Planned', firm: false,
         sen: homeOf(s, t), raw: s.cost, cur: s.cur,
         mark: '', label: kindOf(s.kind).label,
@@ -5110,6 +5106,13 @@ function savePack() {
     $('packQty').value = '';
     $('packItem').focus();
     repaint();
+}
+
+/** No edit mode here — a packing item is three fields and a tick, so this
+    is only ever Clear. */
+function clearPackForm() {
+    ['packGroup', 'packItem', 'packQty'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    $('packItem').focus();
 }
 
 function seedPack() {
@@ -6305,7 +6308,7 @@ function clearActForm() {
     $('actRemind').value = '';
     set('actFormTitle', 'Add a calendar entry');
     set('actSaveLabel', 'Add entry');
-    $('actCancel').hidden = true;
+    setClearBtn('actCancel', false);
     const drop = $('actDrop');
     if (drop) drop.hidden = true;
     if ($('actGoogle')) $('actGoogle').hidden = true;
@@ -6332,7 +6335,7 @@ function openActEdit(id) {
     $('actRemind').value = e.remind == null ? '' : String(e.remind);
     set('actFormTitle', 'Edit calendar entry');
     set('actSaveLabel', 'Save changes');
-    $('actCancel').hidden = false;
+    setClearBtn('actCancel', true);
     const drop = $('actDrop');
     if (drop) drop.hidden = false;
     if ($('actGoogle')) $('actGoogle').hidden = false;
@@ -7071,14 +7074,6 @@ function start() {
     $('stopSave').addEventListener('click', saveStop);
     $('stopCancel').addEventListener('click', () => { clearStopForm(); });
 
-    $('planState').addEventListener('click', (event) => {
-        const btn = event.target.closest('button[data-val]');
-        if (!btn) return;
-        planState = btn.dataset.val;
-        $('planState').querySelectorAll('button').forEach((b) => b.classList.toggle('is-on', b === btn));
-        renderPlan();
-    });
-
     /* Start and end are the stored fact; duration is a way of typing the
        end. Whichever of the three was touched last decides the other two. */
     $('stopTime').addEventListener('input', paintStopClock);
@@ -7191,6 +7186,7 @@ function start() {
     $('bookCancel').addEventListener('click', () => { clearBookForm(); });
     $('packSave').addEventListener('click', savePack);
     $('packSeed').addEventListener('click', seedPack);
+    $('packCancel').addEventListener('click', clearPackForm);
 
     /* Enter in a text field means "add the thing this form is for". */
     document.addEventListener('keydown', (event) => {

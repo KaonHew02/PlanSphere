@@ -2788,9 +2788,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 
 /* Cancelled and skipped. Still legible, because it is still information —
    dimmed rather than struck through, so a long title stays readable. */
-.stop.is-off { opacity: .55; }
-.stop.is-off .stop-title { text-decoration: line-through; text-decoration-thickness: 1px; }
-.stop.is-off::before { background: var(--line-strong); }
 
 /* --------------------------------------------------------------------------
    The attachment

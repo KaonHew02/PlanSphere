@@ -1229,25 +1229,15 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 /* Pointing down means "there is more under here", up means "put it away". */
 .card:not(.is-shut) > .card-head .fold-btn i { transform: rotate(180deg); }
 
-/* The day number on Home's Itinerary card. Same footprint as the category
-   disc beside it on the other cards, so the four decks line up. */
-.day-pip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-    background: var(--azure-soft);
-    color: var(--azure-ink);
-    font-size: 12.5px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    flex: 0 0 auto;
-}
+/* A day on Home is the same day the Itinerary draws, minus the card it sits
+   in — one of them is the page and the other is a tile in a deck, so the
+   outer padding and the top margin come off and nothing else changes. */
+.day.is-flat { margin-top: 0; }
+.day.is-flat .day-head { margin-bottom: 10px; }
 
-.day-pip.is-idle { background: var(--paper-2); color: var(--ink-4); }
-.line-row.is-now .day-pip { background: var(--azure); color: #fff; }
+/* Three columns rather than five: no money and no buttons on this one, so
+   the title takes the room they were holding. */
+.day.is-flat .stop { grid-template-columns: 76px 36px minmax(0, 1fr); }
 
 /* ==========================================================================
    The record bar

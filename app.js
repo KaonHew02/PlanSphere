@@ -1463,59 +1463,62 @@ function paintDashSpend(t) {
     }).join(''));
 }
 
-/* The plan by the day rather than by the stop. Next up already lists the
-   stops themselves, and a second list of the same five would be the same
-   card twice — what this answers is the other question you ask an
-   itinerary: which days are full, which are still empty, and what the
-   full ones are expected to cost. */
+/* The plan, drawn the way the Itinerary screen draws it — the same day
+   heading, the same time rail down the left, the same disc and place. A
+   card that shows the same thing in a different shape is a second thing to
+   learn, and this is the one screen people check at a glance.
+
+   The next day with anything in it, and only that one: this is a card in a
+   deck, and the whole plan is one click away on the Itinerary tab. */
 function paintDashPlan(t, now) {
     const stops = ofTrip(db.stops, t);
 
-    const planned = stops.reduce((n, s) => n + estOf(s, t), 0);
-    set('dashPlanNote', stops.length
-        ? plural(stops.length, 'stop') + (planned ? ' \u00b7 ' + money(planned) : '')
-        : '');
+    set('dashPlanNote', stops.length ? plural(stops.length, 'stop') : '');
 
     if (!stops.length) {
         return html('dashPlan', emptyState('bi-calendar2-week', 'Nothing planned yet',
             'Add a stop on the Itinerary tab and the days fill in.'));
     }
 
-    /* Every day of it, so an empty day is visible as an empty day — that is
-       the one this card is for. Days outside the dates still show, because a
-       stop is never silently dropped for sitting outside them. */
-    const days = [];
-    const length = daysBetween(t.from, t.to);
-    if (t.from && length !== null && length >= 0) {
-        for (let i = 0; i <= Math.min(length, 365); i++) days.push(shiftDate(t.from, i));
-    }
-    stops.forEach((s) => { if (s.date && days.indexOf(s.date) < 0) days.push(s.date); });
-    days.sort();
+    /* From today forward, falling back to the last day that had something
+       once the whole thing is behind you. */
+    const dated = stops.filter((s) => s.date).map((s) => s.date).sort();
+    const ahead = dated.filter((d) => d >= now);
+    const date = ahead.length ? ahead[0] : dated[dated.length - 1];
 
-    /* From today where the trip is running or still ahead: the days behind
-       you are not what you opened the app to read. */
-    const ahead = days.filter((d) => d >= now);
-    const show = (ahead.length ? ahead : days).slice(0, 6);
+    const list = stops.filter((s) => s.date === date).sort(sortStops);
+    const inRange = t.from && date >= t.from && date <= t.to;
+    const n = inRange ? daysBetween(t.from, date) + 1 : null;
 
-    html('dashPlan', show.map((date) => {
-        const on = stops.filter((s) => s.date === date);
-        const est = on.reduce((n, s) => n + estOf(s, t), 0);
-        const n = t.from && date >= t.from && date <= t.to
-            ? daysBetween(t.from, date) + 1
-            : null;
-        return '<div class="line-row' + (date === now ? ' is-now' : '') + '">'
-            + '<span class="day-pip' + (on.length ? '' : ' is-idle') + '">'
-            +   (n ? n : '\u00b7') + '</span>'
-            + '<div class="line-meta"><div class="line-name">' + fmtDay(date) + '</div>'
-            +   '<small class="line-sub">' + (on.length
-                    ? on.slice(0, 2).map((s) => esc(s.title)).join(', ')
-                        + (on.length > 2 ? ' +' + (on.length - 2) + ' more' : '')
-                    : 'Nothing planned') + '</small></div>'
-            + '<div class="line-figures"><div class="line-figure">'
-            +   (est ? money(est) : '<span class="is-muted">\u2014</span>')
-            + '</div></div>'
-            + '</div>';
-    }).join(''));
+    html('dashPlan', '<div class="day is-flat' + (date === now ? ' is-now' : '') + '">'
+        + '<div class="day-head">'
+        +   '<span class="day-n">' + (n ? 'Day ' + n : 'Extra') + '</span>'
+        +   '<span class="day-date">' + fmtDay(date) + '</span>'
+        +   '<span class="day-meta">' + plural(list.length, 'stop') + '</span>'
+        + '</div>'
+        + '<div class="day-stops">' + list.map(dashStopRow).join('') + '</div>'
+        + '</div>');
+}
+
+/** The stop as the Itinerary draws it, without the parts that only make
+    sense next to an edit button — no chips, no actual, no delete — and
+    without the money. What a day costs is a question the Summary and
+    Expenses cards in this same deck already answer; asking it a third time
+    here turns a plan into an invoice. */
+function dashStopRow(s) {
+    const mins = stopRun(s);
+    return '<div class="stop">'
+        + '<span class="stop-clock">'
+        +   '<b class="' + (s.time ? '' : 'is-none') + '">' + (s.time ? fmtTime(s.time) : 'Any time') + '</b>'
+        +   (s.end ? '<small>to ' + fmtTime(s.end) + '</small>' : '')
+        +   (mins ? '<small class="is-run">' + fmtMins(mins) + '</small>' : '')
+        + '</span>'
+        + disc(s.kind)
+        + '<div class="stop-body">'
+        +   '<div class="stop-title">' + esc(s.title) + '</div>'
+        +   (s.where ? '<small class="stop-where"><i class="bi bi-geo-alt"></i>' + esc(s.where) + '</small>' : '')
+        + '</div>'
+        + '</div>';
 }
 
 function figure(label, value, foot) {

@@ -302,13 +302,28 @@
 
             <div class="stack">
 
-                <!-- Which record these figures belong to. Painted from the
-                     store and grouped by kind, because a trip, an event and
-                     an activity are three different questions and a flat run
-                     of names leaves you working out which is which. -->
-                <section class="card is-bar scope-card" id="sumScopeCard" hidden>
-                    <div class="scope-bar" id="sumScope"></div>
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="sumRecDeck">
+                    <div class="card-head">
+                        <h2 id="sumRecDeckTitle">Open one to see its summary</h2>
+                        <span class="card-note" id="sumRecDeckNote"></span>
+                    </div>
+                    <div id="sumRecDeckList"></div>
                 </section>
+
+                <section class="card is-bar rec-head" id="sumRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="sumRecName"></span>
+                        <span class="rec-head-when" id="sumRecWhen"></span>
+                    </div>
+                </section>
+
 
                 <section class="card">
                     <div class="card-head">
@@ -601,13 +616,28 @@
 
             <div class="stack">
 
-                <!-- Which record these figures belong to. Painted from the
-                     store and grouped by kind, because a trip, an event and
-                     an activity are three different questions and a flat run
-                     of names leaves you working out which is which. -->
-                <section class="card is-bar scope-card" id="planScopeCard" hidden>
-                    <div class="scope-bar" id="planScope"></div>
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="planRecDeck">
+                    <div class="card-head">
+                        <h2 id="planRecDeckTitle">Open one to see its itinerary</h2>
+                        <span class="card-note" id="planRecDeckNote"></span>
+                    </div>
+                    <div id="planRecDeckList"></div>
                 </section>
+
+                <section class="card is-bar rec-head" id="planRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="planRecName"></span>
+                        <span class="rec-head-when" id="planRecWhen"></span>
+                    </div>
+                </section>
+
 
                 <section class="card is-bar">
                     <div class="bar-row">
@@ -753,6 +783,29 @@
 
             <div class="stack">
 
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="bookRecDeck">
+                    <div class="card-head">
+                        <h2 id="bookRecDeckTitle">Open one to see its bookings</h2>
+                        <span class="card-note" id="bookRecDeckNote"></span>
+                    </div>
+                    <div id="bookRecDeckList"></div>
+                </section>
+
+                <section class="card is-bar rec-head" id="bookRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="bookRecName"></span>
+                        <span class="rec-head-when" id="bookRecWhen"></span>
+                    </div>
+                </section>
+
+
                 <section class="card">
                     <div class="card-head">
                         <h2 id="bookFormTitle">Add a booking</h2>
@@ -833,13 +886,28 @@
 
             <div class="stack">
 
-                <!-- Which record these figures belong to. Painted from the
-                     store and grouped by kind, because a trip, an event and
-                     an activity are three different questions and a flat run
-                     of names leaves you working out which is which. -->
-                <section class="card is-bar scope-card" id="spendScopeCard" hidden>
-                    <div class="scope-bar" id="spendScope"></div>
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="spendRecDeck">
+                    <div class="card-head">
+                        <h2 id="spendRecDeckTitle">Open one to see its expenses</h2>
+                        <span class="card-note" id="spendRecDeckNote"></span>
+                    </div>
+                    <div id="spendRecDeckList"></div>
                 </section>
+
+                <section class="card is-bar rec-head" id="spendRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="spendRecName"></span>
+                        <span class="rec-head-when" id="spendRecWhen"></span>
+                    </div>
+                </section>
+
 
                 <section class="card is-bar">
                     <div class="bar-row">
@@ -1315,13 +1383,28 @@
 
             <div class="stack">
 
-                <!-- Which record these figures belong to. Painted from the
-                     store and grouped by kind, because a trip, an event and
-                     an activity are three different questions and a flat run
-                     of names leaves you working out which is which. -->
-                <section class="card is-bar scope-card" id="budgetScopeCard" hidden>
-                    <div class="scope-bar" id="budgetScope"></div>
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="budgetRecDeck">
+                    <div class="card-head">
+                        <h2 id="budgetRecDeckTitle">Open one to see its budget</h2>
+                        <span class="card-note" id="budgetRecDeckNote"></span>
+                    </div>
+                    <div id="budgetRecDeckList"></div>
                 </section>
+
+                <section class="card is-bar rec-head" id="budgetRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="budgetRecName"></span>
+                        <span class="rec-head-when" id="budgetRecWhen"></span>
+                    </div>
+                </section>
+
 
                 <section class="card">
                     <div class="card-head">
@@ -1506,6 +1589,29 @@
         <section class="module" id="module-pack" hidden>
 
             <div class="stack">
+
+                <!-- Pick one, then the screen. The deck is the Activities
+                     shelf in miniature; the strip under it is what replaces
+                     it once something is open. Both are painted from the
+                     store by paintDrill(). -->
+                <section class="card rec-deck" id="packRecDeck">
+                    <div class="card-head">
+                        <h2 id="packRecDeckTitle">Open one to see its packing list</h2>
+                        <span class="card-note" id="packRecDeckNote"></span>
+                    </div>
+                    <div id="packRecDeckList"></div>
+                </section>
+
+                <section class="card is-bar rec-head" id="packRecHead">
+                    <div class="rec-head-row">
+                        <button type="button" class="ghost-btn" data-rec-back="1">
+                            <i class="bi bi-arrow-left"></i>Back
+                        </button>
+                        <span class="rec-head-name" id="packRecName"></span>
+                        <span class="rec-head-when" id="packRecWhen"></span>
+                    </div>
+                </section>
+
 
                 <section class="card">
                     <div class="card-head">

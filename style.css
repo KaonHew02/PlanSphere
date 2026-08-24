@@ -1188,68 +1188,52 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     .card-note.is-end { margin-left: 0; }
 }
 
+/* On a deck the footer has lost its two buttons, so "Open" stops being a
+   caption beside them and becomes the whole row. */
+.rec-deck .tc-foot { justify-content: flex-start; }
+
+.rec-deck .trip-card { cursor: pointer; }
+
 /* ==========================================================================
-   The scope bar
+   Pick one, then the screen
 
-   Which record the screen below is about, at the top of the four screens
-   that are about one. A row per kind rather than one long line of names,
-   because "which trip" and "which event" are different questions and the
-   answer to one is noise while you are asking the other. The kind label is
-   set in the same small caps the rest of the app labels a bar with.
+   Six screens are about one record, and each opens on a deck of tiles. Two
+   rules do the whole switch: in deck mode nothing but the deck is on screen,
+   and out of deck mode the deck is put away. Every other card keeps managing
+   its own `hidden` exactly as it did — these never touch it.
    ========================================================================== */
-.scope-card { padding: 14px 18px; }
+.module.is-deck > .stack > .card:not(.rec-deck) { display: none; }
+.module:not(.is-deck) > .stack > .rec-deck { display: none; }
 
-.scope-bar { display: flex; flex-direction: column; gap: 8px; }
+/* The strip that replaces the deck: where you are, and the way back. */
+.rec-head { padding: 12px 18px; }
 
-.scope-row {
-    display: grid;
-    grid-template-columns: 104px minmax(0, 1fr);
-    align-items: start;
-    gap: 12px;
+.rec-head-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
 }
 
-.scope-row + .scope-row { padding-top: 8px; border-top: 1px solid var(--row-line); }
-
-.scope-kind {
-    padding-top: 7px;
-    font-size: 10.5px;
+.rec-head-name {
+    font-size: 16px;
     font-weight: 700;
-    letter-spacing: .07em;
-    text-transform: uppercase;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.rec-head-when {
+    margin-left: auto;
+    font-size: 12.5px;
+    font-weight: 600;
     color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.scope-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.scope-chip {
-    padding: 7px 13px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--paper);
-    color: var(--ink-2);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: border-color .12s ease, color .12s ease;
-}
-
-.scope-chip:hover { border-color: var(--azure); color: var(--azure-ink); }
-
-/* The one that is on is filled rather than outlined: on a bar where every
-   chip is a live control, a border cannot carry "this is the one". */
-.scope-chip.is-on {
-    border-color: transparent;
-    background: var(--azure);
-    color: #fff;
-    font-weight: 700;
-}
-
-.scope-chip.is-on:hover { color: #fff; }
-
 @media (max-width: 700px) {
-    .scope-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-    .scope-kind { padding-top: 0; }
+    .rec-head-row > .ghost-btn { width: 100%; justify-content: center; }
+    .rec-head-when { margin-left: 0; }
 }
 
 /* ==========================================================================

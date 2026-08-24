@@ -754,64 +754,93 @@ function showModule(key) {
 
 /** Whatever is on screen, plus the two things that are always on screen. */
 function repaint() {
-    paintScopes();
+    paintDrill();
     paintCounts();
     MODULES[live]();
 }
 
 /* ====================================================================
-   THE SCOPE BAR
+   PICK ONE, THEN THE SCREEN
 
-   Which record a screen is about. It used to be one <select> in the top
-   bar labelled "Viewing", three metres from the figures it governed, and
-   a control that far from its effect is a control nobody connects to the
-   effect — you read RM 6,000 and had to go looking for whose it was.
+   Six screens are about one record: the itinerary, the expenses, the
+   budget, the summary, the bookings and the packing list. They used to
+   answer to a <select> in the top bar labelled "Viewing", then to a bar
+   of chips, and both had the same problem — a control that names the
+   record is not the same as arriving at the record. You read RM 6,000
+   and had to go looking for whose it was.
 
-   So it moved into the four screens that answer to it, one bar each, and
-   it is grouped by kind on the way: a trip, an event and an activity are
-   three different questions, and a flat run of names leaves you working
-   out which of the three you are looking at. Nearest first inside each
-   row, like the shelf, because what is next is what you open.
+   So each of the six opens on a deck of the same tiles the Activities
+   shelf draws, and you pick one. The deck is put away, a strip carrying
+   the name and the dates takes its place, and the screen underneath is
+   about that one thing until Back is pressed.
 
-   `db.current` is untouched — every trip(), every mine(), every screen
-   below still reads exactly what it always read. Only the control moved,
-   and then multiplied by four.
+   `openRec` is shared across the six on purpose: having opened Mahjong
+   on the Itinerary, walking to Expenses should still be Mahjong. What
+   Back closes is the record, not the screen.
    ==================================================================== */
-const SCOPE_BARS = ['planScope', 'spendScope', 'budgetScope', 'sumScope'];
+const DRILL = {
+    plan:   'itinerary',
+    spend:  'expenses',
+    budget: 'budget',
+    sum:    'summary',
+    book:   'bookings',
+    pack:   'packing list',
+};
 
-function paintScopes() {
-    const rows = KIN_ORDER.map((k) => {
-        const list = db.trips.filter((t) => (t.kind || 'trip') === k).sort(sortNearest);
-        if (!list.length) return '';
-        const kin = kinOf(k);
-        return '<div class="scope-row">'
-            + '<span class="scope-kind">' + kin.mark + ' ' + esc(kin.many) + '</span>'
-            + '<div class="scope-chips">'
-            +   list.map((t) => '<button type="button" data-scope="' + esc(t.id) + '"'
-                    + ' class="scope-chip' + (t.id === db.current ? ' is-on' : '') + '"'
-                    + ' aria-pressed="' + (t.id === db.current ? 'true' : 'false') + '">'
-                    + esc(t.name || 'Untitled ' + kin.label.toLowerCase()) + '</button>').join('')
-            + '</div>'
-            + '</div>';
-    }).join('');
+const DRILL_KEYS = Object.keys(DRILL);
 
-    SCOPE_BARS.forEach((id) => {
-        const bar = $(id);
-        const card = $(id + 'Card');
-        if (bar) bar.innerHTML = rows;
-        /* Nothing planned at all and the bar is a frame around a gap. The
-           empty state each screen already draws says it better. */
-        if (card) card.hidden = !rows;
-    });
+let openRec = false;
 
-    paintScopeTitles();
+/** Opening from anywhere — a tile on a deck, Open on the shelf, a stop
+    clicked on the calendar — is the same act. */
+function openTrip(id) {
+    db.current = id;
+    openRec = true;
+    save();
+    clearStopForm();
+    clearBookForm();
+    repaint();
 }
 
-/** The heading says it as well as the bar does, because a heading is what
-    gets read and a chip is what gets pressed. */
-function paintScopeTitles() {
+function paintDrill() {
     const t = trip();
-    const tail = t ? ' — ' + (t.name || 'Untitled') : '';
+    const open = openRec && !!t;
+
+    /* Painted once and handed to all six: the same deck on every screen,
+       because it is the same question on every screen. */
+    const tiles = db.trips.length
+        ? '<div class="trip-deck">' + db.trips.slice().sort(sortNearest)
+            .map((row) => tripCard(row, { acts: false })).join('') + '</div>'
+        : null;
+
+    DRILL_KEYS.forEach((k) => {
+        const sec = $('module-' + k);
+        if (!sec) return;
+        sec.classList.toggle('is-deck', !open);
+
+        set(k + 'RecDeckTitle', db.trips.length
+            ? 'Open one to see its ' + DRILL[k]
+            : 'Nothing planned yet');
+        set(k + 'RecDeckNote', db.trips.length ? plural(db.trips.length, 'record') : '');
+        html(k + 'RecDeckList', tiles || emptyState('bi-suitcase',
+            'Nothing planned yet',
+            'Create a trip, an event or an activity on the Activities screen first.'));
+        if (!open) return;
+
+        const kin = kinOf(t.kind);
+        set(k + 'RecName', kin.mark + '  ' + (t.name || 'Untitled ' + kin.label.toLowerCase()));
+        set(k + 'RecWhen', t.from
+            ? (kin.span && t.to && t.to !== t.from ? fmtRange(t.from, t.to) : fmtNum(t.from))
+            : 'No dates yet');
+    });
+
+    paintDrillTitles(t, open);
+}
+
+/** The heading says it as well as the strip does, because a heading is what
+    gets read on the way down the page. */
+function paintDrillTitles(t, open) {
+    const tail = open && t ? ' — ' + (t.name || 'Untitled') : '';
     [['planTitle', 'The plan'], ['spendTitle', 'Expenses'],
      ['budgetTitle', 'Where the budget stands'], ['sumTitle', 'At a glance']]
         .forEach(([id, base]) => { if ($(id)) set(id, base + tail); });
@@ -1497,7 +1526,11 @@ function renderTrips() {
    four figures that decide whether you open it. A table could hold the
    same fields but would ask you to read a grid to answer "which one is
    this" — the picture answers it before the words are read. */
-function tripCard(t) {
+/* `acts` is off for the tiles on the six drill-in decks: editing and
+   deleting a record belong to the shelf that owns it, and a trash can on
+   the Budget screen is a trash can somebody presses by accident. */
+function tripCard(t, opts) {
+    const acts = !opts || opts.acts !== false;
     const kin = kinOf(t.kind);
     const st = statusOf(liveStatus(t));
     const cur = t.home || 'MYR';
@@ -1547,9 +1580,11 @@ function tripCard(t) {
         + '</div>'
 
         + '<div class="tc-foot">'
-        +   '<span class="tc-open">' + (t.id === db.current ? 'Open now' : 'Open') + '</span>'
-        +   '<button type="button" class="row-x is-edit" data-edit-trip="' + esc(t.id) + '" title="Edit"><i class="bi bi-pencil"></i></button>'
-        +   '<button type="button" class="row-x" data-drop-trip="' + esc(t.id) + '" title="Delete"><i class="bi bi-trash3"></i></button>'
+        +   '<span class="tc-open">' + (t.id === db.current && openRec ? 'Open now' : 'Open') + '</span>'
+        +   (acts
+            ? '<button type="button" class="row-x is-edit" data-edit-trip="' + esc(t.id) + '" title="Edit"><i class="bi bi-pencil"></i></button>'
+                + '<button type="button" class="row-x" data-drop-trip="' + esc(t.id) + '" title="Delete"><i class="bi bi-trash3"></i></button>'
+            : '')
         + '</div>'
         + '</article>';
 }
@@ -4591,7 +4626,7 @@ function renderBudget() {
     }
 
     /* The title carries the record's name and is written by
-       paintScopeTitles(), so it is not rewritten here. */
+       paintDrillTitles(), so it is not rewritten here. */
     set('budgetCurTag', 'in ' + (t.home || 'MYR'));
     paintRates(t);
 
@@ -6135,10 +6170,11 @@ function openItem(key) {
     /* A stop or a booking belongs to a trip that may not be the one on the
        top bar. Switch to it first, or the module opens showing someone
        else's plan. */
-    if (it.trip && it.trip !== db.current) {
+    if (it.trip) {
         db.current = it.trip;
+        openRec = true;
         save();
-        paintScopes();
+        paintDrill();
         clearStopForm();
         clearBookForm();
     }
@@ -6693,7 +6729,7 @@ function start() {
     holLoad();
     loadNav();
     paintStamp();
-    paintScopes();
+    paintDrill();
     paintCounts();
     calCursor = today();
     clearTripForm();
@@ -7301,7 +7337,13 @@ function start() {
                 () => {
                     db.trips = db.trips.filter((x) => x.id !== dropT);
                     ['stops', 'books', 'packs', 'notes', 'spend', 'docs', 'settle'].forEach((k) => { db[k] = db[k].filter((r) => r.trip !== dropT); });
-                    if (db.current === dropT) db.current = db.trips.length ? db.trips[0].id : null;
+                    /* Deleting the one that was open closes it rather than
+                       sliding a different record in under the same heading —
+                       six screens would quietly change what they were about. */
+                    if (db.current === dropT) {
+                        db.current = db.trips.length ? db.trips[0].id : null;
+                        openRec = false;
+                    }
                     save();
                     clearTripForm();
                     repaint();
@@ -7314,26 +7356,13 @@ function start() {
         const dropTy = hit('data-drop-type');
         if (dropTy) return dropType(dropTy);
 
-        /* A chip on a scope bar and Open on the shelf are the same act:
-           they change which record every screen is about. */
-        const scope = hit('data-scope');
-        if (scope && scope !== db.current) {
-            db.current = scope;
-            save();
-            clearStopForm();
-            clearBookForm();
+        if (hit('data-rec-back')) {
+            openRec = false;
             return repaint();
         }
-        if (scope) return;
 
         const open = hit('data-open-trip');
-        if (open) {
-            db.current = open;
-            save();
-            clearStopForm();
-            clearBookForm();
-            return repaint();
-        }
+        if (open) return openTrip(open);
 
         const att = hit('data-open-att');
         if (att) return openAtt(att);

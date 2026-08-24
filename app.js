@@ -452,6 +452,10 @@ const newId = (prefix) => prefix + '-' + Date.now().toString(36) + '-' + (idSeq+
 const trip = () => db.trips.find((t) => t.id === db.current) || null;
 const mine = (list) => list.filter((row) => row.trip === db.current);
 
+/** Home is about whatever is next rather than whatever is open, so its own
+    painters ask for a trip instead of assuming the current one. */
+const ofTripSpend = (t) => db.spend.filter((x) => t && x.trip === t.id);
+
 /* ====================================================================
    THE DATE FIELD
 
@@ -1054,7 +1058,7 @@ function renderDash() {
         set('dashStopsFoot', '—');
         set('dashLeft', 'RM 0');
         set('dashLeftFoot', '—');
-        ['dashNext', 'dashHold', 'dashPack', 'dashSettle'].forEach((id) =>
+        ['dashNext', 'dashSpend', 'dashPack', 'dashBreak'].forEach((id) =>
             html(id, emptyState('bi-compass', 'Nothing open',
                 'Open Activities and create one — it takes a name and two dates.')));
         return;
@@ -1102,9 +1106,9 @@ function renderDash() {
         : 'No budget set');
 
     paintNext(stops, now);
-    paintHold();
+    paintDashSpend(t);
     paintPackSummary();
-    paintDashSettle(t);
+    paintDashBreak(t);
 }
 
 /* ====================================================================
@@ -1371,67 +1375,90 @@ function paintNext(stops, now) {
         + '</div>').join(''));
 }
 
-/** What is left to hand over, read off the Settlement. */
-function paintDashSettle(t) {
-    const plan = settlePlan(t);
-    const live = plan.filter((tr) => {
-        const row = settleRow(t, tr.from, tr.to);
-        return settleStatus(row, tr.amount) !== 'paid' && !(row && row.cancelled);
+/** Where it went, in the categories the Summary screen uses — the one
+    figure the hero cannot carry, because a total says how much and this
+    says what on. */
+function paintDashBreak(t) {
+    const bag = {};
+    ofTripSpend(t).forEach((x) => {
+        const c = spendCatOf(x.cat);
+        bag[c.id] = (bag[c.id] || 0) + homeOf({ cost: x.amount, cur: x.cur }, t);
     });
 
-    if (!plan.length) {
-        set('dashSettleNote', '');
-        return html('dashSettle', emptyState('bi-check2-circle', 'Everybody is square',
-            'What everyone put in matches what they used.'));
+    const rows = db.spendCats.filter((c) => bag[c.id])
+        .map((c) => ({ c, sen: bag[c.id] }))
+        .sort((a, b) => b.sen - a.sen);
+    const total = rows.reduce((n, r) => n + r.sen, 0);
+
+    if (!total) {
+        set('dashBreakNote', '');
+        return html('dashBreak', emptyState('bi-pie-chart', 'Nothing to add up yet',
+            'The first expense fills this in.'));
     }
 
-    set('dashSettleNote', live.length ? plural(live.length, 'transfer') + ' left' : 'all settled');
+    const budget = t.budget || 0;
+    const over = budget && total > budget;
+    set('dashBreakNote', budget
+        ? (over ? money(total - budget) + ' over' : money(budget - total) + ' left')
+        : money(total) + ' spent');
 
-    if (!live.length) {
-        return html('dashSettle', emptyState('bi-check2-circle', 'All settled',
-            'Every transfer has been handed over.'));
-    }
+    /* Against the budget where there is one, so the empty part of the bar is
+       money still unspent rather than dead space. */
+    const scale = budget && !over ? budget : total;
 
-    html('dashSettle', live.map((tr) => {
-        const row = settleRow(t, tr.from, tr.to);
-        const paid = row ? row.paid : 0;
-        return '<div class="line-row">'
-            + '<span class="person-mark is-sm">' + esc(initials(tr.fromName)) + '</span>'
-            + '<div class="line-meta"><div class="line-name">' + esc(tr.fromName) + ' → ' + esc(tr.toName) + '</div>'
-            +   '<small class="line-sub">' + (paid
-                    ? moneyIn(paid, t.home || 'MYR') + ' of it handed over'
-                    : 'nothing handed over yet') + '</small></div>'
-            + '<div class="line-figures"><div class="line-figure">'
-            +   '<b>' + moneyIn(tr.amount - paid, t.home || 'MYR') + '</b>'
-            + '</div></div>'
-            + '</div>';
-    }).join(''));
+    /* Five at most: this is a card in a deck, not the Summary screen. */
+    const top = rows.slice(0, 5);
+    const rest = rows.slice(5).reduce((n, r) => n + r.sen, 0);
+
+    html('dashBreak', ''
+        + '<div class="dist">'
+        +   rows.map((r) => '<i style="width:' + (r.sen / scale * 100).toFixed(2) + '%;'
+                + 'background:var(' + TONES[r.c.tone || 'slate'][0] + ')"></i>').join('')
+        + '</div>'
+        + '<div class="break-rows">'
+        +   top.map((r) => '<div class="break-row" style="' + tone(r.c) + '">'
+                + '<span class="dot"></span>'
+                + '<span class="br-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
+                + '<span class="br-val">' + money(r.sen) + '</span>'
+                + '<span class="br-pct">' + Math.round(r.sen / total * 100) + '%</span>'
+                + '</div>').join('')
+        +   (rest
+                ? '<div class="break-row is-idle"><span class="dot" style="background:var(--track-2)"></span>'
+                    + '<span class="br-name">' + plural(rows.length - top.length, 'other') + '</span>'
+                    + '<span class="br-val">' + money(rest) + '</span>'
+                    + '<span class="br-pct">' + Math.round(rest / total * 100) + '%</span></div>'
+                : '')
+        + '</div>');
 }
 
-function paintHold() {
-    const open = mine(db.books)
-        .filter((b) => b.status !== 'paid')
-        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+function paintDashSpend(t) {
+    const all = ofTripSpend(t);
+    const spent = all.reduce((n, x) => n + homeOf({ cost: x.amount, cur: x.cur }, t), 0);
 
-    const owing = open.reduce((n, b) => n + (b.cost || 0), 0);
-    set('dashHoldNote', open.length ? money(owing) + ' still to pay' : '');
+    set('dashSpendNote', all.length ? plural(all.length, 'expense') + ' \u00b7 ' + money(spent) : '');
 
-    if (!open.length) {
-        return html('dashHold', emptyState('bi-check2-circle',
-            'Everything is paid', 'No bookings are sitting on hold.'));
+    if (!all.length) {
+        return html('dashSpend', emptyState('bi-cash-coin', 'Nothing spent yet',
+            'Every receipt, every fare, every round goes on the Expenses tab.'));
     }
 
-    html('dashHold', open.map((b) => {
-        const st = STATUS[b.status] || STATUS.idea;
-        return ''
-        + '<div class="line-row">'
-        +   disc(b.kind)
-        +   '<div class="line-meta"><div class="line-name">' + esc(b.title) + '</div>'
-        +     '<small class="line-sub">' + (b.who ? esc(b.who) + ' · ' : '') + fmtDay(b.date) + '</small></div>'
-        +   '<div class="line-figures"><div class="line-figure">'
-        +     '<span class="tag ' + st.tag + '">' + st.label + '</span>' + amount(b.cost, b.cur, trip())
-        +   '</div></div>'
-        + '</div>';
+    const recent = all.slice()
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+        .slice(0, 5);
+
+    html('dashSpend', recent.map((x) => {
+        const c = spendCatOf(x.cat);
+        const who = x.by ? nameOf(t, x.by) : '';
+        return '<div class="line-row">'
+            + '<span class="disc cat is-sm" style="' + tone(c) + '">' + c.mark + '</span>'
+            + '<div class="line-meta"><div class="line-name">'
+            +   esc(x.merchant || x.desc || c.label) + '</div>'
+            +   '<small class="line-sub">' + fmtDay(x.date)
+            +   (who ? ' \u00b7 ' + esc(who) : '') + '</small></div>'
+            + '<div class="line-figures"><div class="line-figure">'
+            +   amount(x.amount, x.cur, t)
+            + '</div></div>'
+            + '</div>';
     }).join(''));
 }
 
@@ -3729,7 +3756,18 @@ function openSpendForm(id) {
     /* A new expense is for everybody by default — the common case is the
        whole group, and unticking is quicker than ticking five people. */
     spendWho = x ? (x.who || []).slice() : peopleOf(t).map((p) => p.id);
-    spendParts = x ? Object.assign({}, x.parts) : {};
+    /* A custom-amount split is stored in sen, like every other figure in
+       the app, and the field it goes back into is in ringgit — the same
+       fromSen() the amount field above gets. Without it a 24.70 split came
+       back as 2470, and saving that again multiplied it by another hundred.
+       A percentage is a percentage either way and is copied across. */
+    spendParts = {};
+    if (x && x.parts) {
+        const exact = (x.split || 'equal') === 'exact';
+        Object.keys(x.parts).forEach((k) => {
+            spendParts[k] = exact ? fromSen(x.parts[k]) : x.parts[k];
+        });
+    }
     receiptHeld = x ? (x.receipt || null) : null;
     spendAtts = x && x.atts ? x.atts.slice() : [];
 

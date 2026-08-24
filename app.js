@@ -728,27 +728,26 @@ function unfold(key) {
 /* --------------------------------------------------------------------
    Clear, and Cancel
 
-   Four of these forms stand open on their screen rather than appearing
-   when you press Add — the stop, the booking, the calendar entry and the
-   packing item. On those, the button beside the heading only ever showed
-   itself while you were editing something, where it meant "stop editing
-   this one". Typing three fields into a fresh form and changing your
-   mind left you deleting them by hand.
+   Two different things, so two buttons.
 
-   So it is always there, and it says which of the two things it is
-   about to do. Both are the same call — the form's own clear function
-   returns it to adding nothing, which is exactly what cancelling an edit
-   means too.
+   **Clear** empties what you typed and leaves you where you are. On a
+   fresh form that is the whole of it; part-way through editing something
+   it blanks the fields without letting go of the record, so you can type
+   the whole thing again over the top of itself.
+
+   **Cancel** is about the act rather than the contents: it abandons the
+   add or the edit. On the five forms that appear when you press Add, it
+   closes the card. On the three that stand open on their screen there is
+   nothing to close, so it means "stop editing this one and go back to
+   adding" — which is why it is the button that comes and goes, and Clear
+   is the one that is always there.
+
+   The packing form has no edit mode at all: three fields and a tick. It
+   gets a Clear and nothing to cancel.
    -------------------------------------------------------------------- */
-function setClearBtn(id, editing) {
+function setCancelBtn(id, editing) {
     const btn = $(id);
-    if (!btn) return;
-    btn.hidden = false;
-    btn.innerHTML = '<i class="bi ' + (editing ? 'bi-x-lg' : 'bi-eraser') + '"></i>'
-        + (editing ? 'Cancel' : 'Clear');
-    btn.title = editing
-        ? 'Stop editing this one and go back to adding'
-        : 'Empty the fields';
+    if (btn) btn.hidden = !editing;
 }
 
 /* ====================================================================
@@ -1770,14 +1769,18 @@ function openTripEdit(id) {
 /* Closed rather than emptied. The form is not the resting state of this
    screen — the shelf is — so it goes away when there is nothing being
    filled in, and Create New brings it back. */
-function clearTripForm() {
-    editTrip = null;
+function blankTripForm() {
     coverHeld = '';
-    const card = $('tripFormCard');
-    if (card) card.hidden = true;
     ['tripName', 'tripWhere', 'tripFrom', 'tripTo', 'tripWho', 'tripBudget', 'tripDesc']
         .forEach((id) => { const el = $(id); if (el) el.value = ''; });
     paintCover();
+}
+
+function clearTripForm() {
+    editTrip = null;
+    const card = $('tripFormCard');
+    if (card) card.hidden = true;
+    blankTripForm();
 }
 
 function saveTrip() {
@@ -2378,8 +2381,9 @@ function saveStop() {
     repaint();
 }
 
-function clearStopForm() {
-    editStop = null;
+/** The fields, and nothing else — whatever is being edited stays being
+    edited. */
+function blankStopForm() {
     attHeld = null;
     const t = trip();
     ['stopTitle', 'stopWhere', 'stopTime', 'stopEnd', 'stopMins', 'stopCost', 'stopDesc', 'stopNote', 'stopActual']
@@ -2391,9 +2395,14 @@ function clearStopForm() {
     fillStopSources('');
     paintAtt();
     paintStopClock();
+}
+
+function clearStopForm() {
+    editStop = null;
+    blankStopForm();
     set('stopFormTitle', 'Add a stop');
     set('stopSaveLabel', 'Add stop');
-    setClearBtn('stopCancel', false);
+    setCancelBtn('stopCancel', false);
 }
 
 function openStopEdit(id) {
@@ -2419,7 +2428,7 @@ function openStopEdit(id) {
     paintStopClock();
     set('stopFormTitle', 'Edit stop');
     set('stopSaveLabel', 'Save changes');
-    setClearBtn('stopCancel', true);
+    setCancelBtn('stopCancel', true);
     $('stopTitle').focus();
     $('stopTitle').scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
@@ -2798,11 +2807,15 @@ function openNoteForm(id) {
     $('noteForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function closeNoteForm() {
-    editNote = null;
+function blankNoteForm() {
     noteAtts = [];
     ['noteTitle', 'noteBody', 'noteLinks', 'noteDate'].forEach((id) => { $(id).value = ''; });
     paintNoteAtts();
+}
+
+function closeNoteForm() {
+    editNote = null;
+    blankNoteForm();
     $('noteForm').hidden = true;
 }
 
@@ -2965,17 +2978,21 @@ function saveBook() {
     repaint();
 }
 
-function clearBookForm() {
-    editBook = null;
+function blankBookForm() {
     const t = trip();
     ['bookTitle', 'bookWho', 'bookRef', 'bookCost'].forEach((id) => { $(id).value = ''; });
     $('bookDate').value = t ? t.from : '';
     fillKindSelect($('bookKind'), 'travel');
     $('bookStatus').value = 'held';
     fillCurSelect($('bookCur'), homeCur());
+}
+
+function clearBookForm() {
+    editBook = null;
+    blankBookForm();
     set('bookFormTitle', 'Add a booking');
     set('bookSaveLabel', 'Add booking');
-    setClearBtn('bookCancel', false);
+    setCancelBtn('bookCancel', false);
 }
 
 function openBookEdit(id) {
@@ -2993,7 +3010,7 @@ function openBookEdit(id) {
     $('bookRef').value = b.ref || '';
     set('bookFormTitle', 'Edit booking');
     set('bookSaveLabel', 'Save changes');
-    setClearBtn('bookCancel', true);
+    setCancelBtn('bookCancel', true);
     $('bookTitle').focus();
     $('bookTitle').scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
@@ -3113,9 +3130,13 @@ function openPersonForm(id) {
     $('personForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function blankPersonForm() {
+    ['personName', 'personPhone', 'personEmail', 'personNote'].forEach((id) => { $(id).value = ''; });
+}
+
 function closePersonForm() {
     editPerson = null;
-    ['personName', 'personPhone', 'personEmail', 'personNote'].forEach((id) => { $(id).value = ''; });
+    blankPersonForm();
     $('personForm').hidden = true;
 }
 
@@ -3710,12 +3731,16 @@ function closeSpendForm() {
     db.docs.forEach((d) => { if (d.pending) delete d.pending; });
 
     editSpend = null;
+    blankSpendForm();
+    $('spendFormCard').hidden = true;
+}
+
+function blankSpendForm() {
     spendWho = [];
     spendParts = {};
     receiptHeld = null;
     spendAtts = [];
     ['spendMerchant', 'spendDesc', 'spendAmount', 'spendNoteText', 'spendTime'].forEach((id) => { $(id).value = ''; });
-    $('spendFormCard').hidden = true;
 }
 
 /* A reference somebody can say out loud, counted per trip so two trips do
@@ -4570,6 +4595,13 @@ function openDocForm(id) {
     $('docTitle').focus();
 }
 
+/* A document is always an edit of one that exists, so there is nothing to
+   reset it to — Clear empties the words and leaves the file alone. */
+function blankDocForm() {
+    ['docTitle', 'docNoteText'].forEach((id) => { if ($(id)) $(id).value = ''; });
+    if ($('docDate')) $('docDate').value = '';
+}
+
 function closeDocForm() {
     editDoc = null;
     $('docFormCard').hidden = true;
@@ -5110,7 +5142,7 @@ function savePack() {
 
 /** No edit mode here — a packing item is three fields and a tick, so this
     is only ever Clear. */
-function clearPackForm() {
+function blankPackForm() {
     ['packGroup', 'packItem', 'packQty'].forEach((id) => { if ($(id)) $(id).value = ''; });
     $('packItem').focus();
 }
@@ -6300,15 +6332,19 @@ function saveAct() {
     repaint();
 }
 
-function clearActForm() {
-    editAct = null;
+function blankActForm() {
     ['actTitle', 'actWhere', 'actNote', 'actTime', 'actEnd'].forEach((id) => { $(id).value = ''; });
     $('actDate').value = calCursor || today();
     fillCatSelect('personal');
     $('actRemind').value = '';
+}
+
+function clearActForm() {
+    editAct = null;
+    blankActForm();
     set('actFormTitle', 'Add a calendar entry');
     set('actSaveLabel', 'Add entry');
-    setClearBtn('actCancel', false);
+    setCancelBtn('actCancel', false);
     const drop = $('actDrop');
     if (drop) drop.hidden = true;
     if ($('actGoogle')) $('actGoogle').hidden = true;
@@ -6335,7 +6371,7 @@ function openActEdit(id) {
     $('actRemind').value = e.remind == null ? '' : String(e.remind);
     set('actFormTitle', 'Edit calendar entry');
     set('actSaveLabel', 'Save changes');
-    setClearBtn('actCancel', true);
+    setCancelBtn('actCancel', true);
     const drop = $('actDrop');
     if (drop) drop.hidden = false;
     if ($('actGoogle')) $('actGoogle').hidden = false;
@@ -6919,6 +6955,7 @@ function start() {
     });
 
     $('actSave').addEventListener('click', saveAct);
+    $('actClear').addEventListener('click', blankActForm);
     $('actCancel').addEventListener('click', clearActForm);
 
     $('actDrop').addEventListener('click', () => {
@@ -7027,6 +7064,7 @@ function start() {
 
     /* ---- Module 02 ---- */
     $('tripSave').addEventListener('click', saveTrip);
+    $('tripClear').addEventListener('click', blankTripForm);
     $('tripCancel').addEventListener('click', () => { clearTripForm(); });
 
     $('newOpen').addEventListener('click', (event) => {
@@ -7072,6 +7110,7 @@ function start() {
 
     /* ---- Module 03 ---- */
     $('stopSave').addEventListener('click', saveStop);
+    $('stopClear').addEventListener('click', blankStopForm);
     $('stopCancel').addEventListener('click', () => { clearStopForm(); });
 
     /* Start and end are the stored fact; duration is a way of typing the
@@ -7105,6 +7144,7 @@ function start() {
     $('scanConfirm').addEventListener('click', scanToExpense);
     $('scanFile').addEventListener('click', scanToDoc);
 
+    $('docClear').addEventListener('click', blankDocForm);
     $('docCancel').addEventListener('click', closeDocForm);
     $('docSave').addEventListener('click', saveDoc);
 
@@ -7125,9 +7165,11 @@ function start() {
         });
 
     $('spendAdd').addEventListener('click', () => openSpendForm(null));
+    $('spendClear').addEventListener('click', blankSpendForm);
     $('spendCancel').addEventListener('click', closeSpendForm);
     $('spendSave').addEventListener('click', saveSpend);
     $('peopleAdd').addEventListener('click', () => openPersonForm(null));
+    $('personClear').addEventListener('click', blankPersonForm);
     $('personCancel').addEventListener('click', closePersonForm);
     $('personSave').addEventListener('click', savePerson);
     $('spendCatAdd').addEventListener('click', addSpendCat);
@@ -7162,6 +7204,7 @@ function start() {
     });
 
     $('noteAdd').addEventListener('click', () => openNoteForm(null));
+    $('noteClear').addEventListener('click', blankNoteForm);
     $('noteCancel').addEventListener('click', closeNoteForm);
     $('noteSave').addEventListener('click', saveNote);
 
@@ -7183,10 +7226,11 @@ function start() {
     });
 
     $('bookSave').addEventListener('click', saveBook);
+    $('bookClear').addEventListener('click', blankBookForm);
     $('bookCancel').addEventListener('click', () => { clearBookForm(); });
     $('packSave').addEventListener('click', savePack);
     $('packSeed').addEventListener('click', seedPack);
-    $('packCancel').addEventListener('click', clearPackForm);
+    $('packClear').addEventListener('click', blankPackForm);
 
     /* Enter in a text field means "add the thing this form is for". */
     document.addEventListener('keydown', (event) => {

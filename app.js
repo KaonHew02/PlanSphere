@@ -455,6 +455,7 @@ const mine = (list) => list.filter((row) => row.trip === db.current);
 /** Home is about whatever is next rather than whatever is open, so its own
     painters ask for a trip instead of assuming the current one. */
 const ofTripSpend = (t) => db.spend.filter((x) => t && x.trip === t.id);
+const ofTrip = (list, t) => list.filter((r) => t && r.trip === t.id);
 
 /* ====================================================================
    THE DATE FIELD
@@ -1058,7 +1059,7 @@ function renderDash() {
         set('dashStopsFoot', '—');
         set('dashLeft', 'RM 0');
         set('dashLeftFoot', '—');
-        ['dashNext', 'dashSpend', 'dashPack', 'dashBreak'].forEach((id) =>
+        ['dashNext', 'dashSpend', 'dashPlan', 'dashBreak'].forEach((id) =>
             html(id, emptyState('bi-compass', 'Nothing open',
                 'Open Activities and create one — it takes a name and two dates.')));
         return;
@@ -1107,7 +1108,7 @@ function renderDash() {
 
     paintNext(stops, now);
     paintDashSpend(t);
-    paintPackSummary();
+    paintDashPlan(t, now);
     paintDashBreak(t);
 }
 
@@ -1462,34 +1463,61 @@ function paintDashSpend(t) {
     }).join(''));
 }
 
-function paintPackSummary() {
-    const items = mine(db.packs);
-    const done = items.filter((p) => p.done).length;
+/* The plan by the day rather than by the stop. Next up already lists the
+   stops themselves, and a second list of the same five would be the same
+   card twice — what this answers is the other question you ask an
+   itinerary: which days are full, which are still empty, and what the
+   full ones are expected to cost. */
+function paintDashPlan(t, now) {
+    const stops = ofTrip(db.stops, t);
 
-    if (!items.length) {
-        set('dashPackNote', '');
-        return html('dashPack', emptyState('bi-bag',
-            'Nothing on the list', 'Packing can start from a standard list in one click.'));
+    const planned = stops.reduce((n, s) => n + estOf(s, t), 0);
+    set('dashPlanNote', stops.length
+        ? plural(stops.length, 'stop') + (planned ? ' \u00b7 ' + money(planned) : '')
+        : '');
+
+    if (!stops.length) {
+        return html('dashPlan', emptyState('bi-calendar2-week', 'Nothing planned yet',
+            'Add a stop on the Itinerary tab and the days fill in.'));
     }
 
-    const pct = Math.round(done / items.length * 100);
-    set('dashPackNote', done + ' of ' + items.length);
+    /* Every day of it, so an empty day is visible as an empty day — that is
+       the one this card is for. Days outside the dates still show, because a
+       stop is never silently dropped for sitting outside them. */
+    const days = [];
+    const length = daysBetween(t.from, t.to);
+    if (t.from && length !== null && length >= 0) {
+        for (let i = 0; i <= Math.min(length, 365); i++) days.push(shiftDate(t.from, i));
+    }
+    stops.forEach((s) => { if (s.date && days.indexOf(s.date) < 0) days.push(s.date); });
+    days.sort();
 
-    const groups = groupBy(items, (p) => p.group || 'Other');
-    html('dashPack', ''
-        + '<div class="prog"><i class="' + (done === items.length ? 'is-done' : '') + '" style="width:' + pct + '%"></i></div>'
-        + '<div class="legend">'
-        +   Object.keys(groups).map((g) => {
-                const list = groups[g];
-                const n = list.filter((p) => p.done).length;
-                return '<span class="legend-item">' + esc(g) + ' <b>' + n + '/' + list.length + '</b></span>';
-            }).join('')
-        + '</div>');
+    /* From today where the trip is running or still ahead: the days behind
+       you are not what you opened the app to read. */
+    const ahead = days.filter((d) => d >= now);
+    const show = (ahead.length ? ahead : days).slice(0, 6);
+
+    html('dashPlan', show.map((date) => {
+        const on = stops.filter((s) => s.date === date);
+        const est = on.reduce((n, s) => n + estOf(s, t), 0);
+        const n = t.from && date >= t.from && date <= t.to
+            ? daysBetween(t.from, date) + 1
+            : null;
+        return '<div class="line-row' + (date === now ? ' is-now' : '') + '">'
+            + '<span class="day-pip' + (on.length ? '' : ' is-idle') + '">'
+            +   (n ? n : '\u00b7') + '</span>'
+            + '<div class="line-meta"><div class="line-name">' + fmtDay(date) + '</div>'
+            +   '<small class="line-sub">' + (on.length
+                    ? on.slice(0, 2).map((s) => esc(s.title)).join(', ')
+                        + (on.length > 2 ? ' +' + (on.length - 2) + ' more' : '')
+                    : 'Nothing planned') + '</small></div>'
+            + '<div class="line-figures"><div class="line-figure">'
+            +   (est ? money(est) : '<span class="is-muted">\u2014</span>')
+            + '</div></div>'
+            + '</div>';
+    }).join(''));
 }
 
-/** One figure with a label over it and a line under it. Shared by the
-    Dashboard, the Expenses summary and the Budget headline, so a figure
-    looks the same wherever the app states one. */
 function figure(label, value, foot) {
     return '<div class="spend-figure"><span class="sf-label">' + esc(label) + '</span>'
         + '<b class="sf-value">' + value + '</b>'

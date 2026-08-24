@@ -1189,6 +1189,47 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 }
 
 /* ==========================================================================
+   Cards that fold
+
+   A form you are not filling in and a list of category names you are not
+   editing are both furniture between you and the thing you opened the
+   screen for. Folded, the card is its own heading and nothing else.
+   ========================================================================== */
+[data-fold] > .card-head { cursor: pointer; user-select: none; }
+
+.card.is-shut > *:not(.card-head) { display: none; }
+
+/* Shut, the head is the whole card, so the rule under it has nothing left to
+   separate and the padding under it is a gap for no reason. */
+.card.is-shut > .card-head {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.fold-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .12s ease;
+}
+
+.fold-btn:hover { background: var(--azure-soft); }
+.fold-btn i { transition: transform .16s ease; }
+
+/* Pointing down means "there is more under here", up means "put it away". */
+.card:not(.is-shut) > .card-head .fold-btn i { transform: rotate(180deg); }
+
+/* ==========================================================================
    The record bar
 
    What is open, and the six questions you can ask about it. It sits above

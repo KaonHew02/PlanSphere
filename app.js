@@ -641,6 +641,92 @@ function wireDatePop() {
 }
 
 /* ====================================================================
+   CARDS THAT FOLD
+
+   Ten of these screens carry a card you are not reading: a form for
+   adding the next thing, or a list of the words this app files things
+   under. Both matter and neither is what you came to the screen for, and
+   an "Add a stop" form standing open above the plan is 400px of empty
+   fields between you and the plan.
+
+   So they fold, and they start folded. What is on the screen when you
+   arrive is what the screen is about; the rest is one press away and
+   stays where you put it, because somebody adding six stops in a row
+   should not have to open the same form six times.
+
+   The mark-up is untouched — a `data-fold` on the section is the whole
+   contract, and the chevron is put into the head from here.
+   ==================================================================== */
+const FOLD_KEY = 'plansphere.folded.v1';
+
+let folded = {};
+
+function foldLoad() {
+    try { folded = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; }
+    catch (err) { folded = {}; }
+}
+
+function foldSave() {
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch (err) { /* not vital */ }
+}
+
+/** Folded unless this browser has been told otherwise. */
+const isShut = (key) => folded[key] !== false;
+
+function foldInit() {
+    foldLoad();
+
+    document.querySelectorAll('[data-fold]').forEach((card) => {
+        const key = card.dataset.fold;
+        const head = card.querySelector('.card-head');
+        if (!head) return;
+
+        let acts = head.querySelector('.card-actions');
+        if (!acts) {
+            acts = document.createElement('div');
+            acts.className = 'card-actions';
+            /* Whatever was sitting loose in the head — usually a count —
+               moves in with it, so the chevron is not orphaned. */
+            [...head.children].forEach((el) => { if (el.tagName !== 'H2') acts.appendChild(el); });
+            head.appendChild(acts);
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'fold-btn';
+        btn.dataset.foldToggle = key;
+        btn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+        acts.appendChild(btn);
+
+        paintFold(key);
+    });
+}
+
+function paintFold(key) {
+    const card = document.querySelector('[data-fold="' + key + '"]');
+    if (!card) return;
+    const shut = isShut(key);
+    card.classList.toggle('is-shut', shut);
+    const btn = card.querySelector('[data-fold-toggle]');
+    if (btn) {
+        btn.setAttribute('aria-expanded', shut ? 'false' : 'true');
+        btn.title = shut ? 'Show this' : 'Hide this';
+    }
+}
+
+function foldSet(key, shut) {
+    folded[key] = shut;
+    foldSave();
+    paintFold(key);
+}
+
+/** Opening a record for editing has to open the form it lands in, or the
+    fields are filled in behind a closed lid. */
+function unfold(key) {
+    if (isShut(key)) foldSet(key, false);
+}
+
+/* ====================================================================
    NAVIGATION
 
    The sidebar is a column on a desktop and a drawer on a phone, and one
@@ -759,6 +845,13 @@ function showModule(key) {
 
     paintRecBar();
     MODULES[shown]();
+
+    /* A new screen starts at its top. Landing halfway down one because that
+       is where you left the last one is the other half of "I had to scroll
+       up to get out of here". Instant rather than smooth: the handful of
+       flows that open a form scroll it into view straight after this, and
+       two animations racing is one of them losing. */
+    window.scrollTo(0, 0);
 }
 
 /** Whatever is on screen, plus the two things that are always on screen. */
@@ -2299,6 +2392,7 @@ function clearStopForm() {
 }
 
 function openStopEdit(id) {
+    unfold('stopForm');
     const s = db.stops.find((x) => x.id === id);
     if (!s) return;
     editStop = id;
@@ -2889,6 +2983,7 @@ function clearBookForm() {
 }
 
 function openBookEdit(id) {
+    unfold('bookForm');
     const b = db.books.find((x) => x.id === id);
     if (!b) return;
     editBook = id;
@@ -6225,6 +6320,7 @@ function openActEdit(id) {
     const e = db.events.find((x) => x.id === id);
     if (!e) return;
     if (live !== 'trips') showModule('trips');
+    unfold('actForm');
     editAct = id;
     fillCatSelect(e.cat || 'personal');
     $('actDate').value = e.date || '';
@@ -6709,6 +6805,7 @@ function start() {
        through the accessor these put on the field. */
     upgradeDateFields();
     wireDatePop();
+    foldInit();
 
     load();
     fxLoad();
@@ -6739,9 +6836,16 @@ function start() {
     $('navScrim').addEventListener('click', closeDrawer);
     window.addEventListener('resize', paintNav);
 
+    /* A row in the sidebar means "take me to that screen", and the screen
+       Activities means is the shelf. Pressing it from inside an open record
+       was doing nothing at all — the record was already on Activities — so
+       the way out was a Back button somewhere above a page you had scrolled
+       down. Pressing the row you are already on now closes what is open in
+       it, which is the only thing pressing it could sensibly mean. */
     $('tabs').addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-module]');
         if (!btn) return;
+        openRec = false;
         showModule(btn.dataset.module);
         if (navIsDrawer()) closeDrawer();
     });
@@ -7342,6 +7446,18 @@ function start() {
 
         const dropTy = hit('data-drop-type');
         if (dropTy) return dropType(dropTy);
+
+        const fold = event.target.closest('[data-fold-toggle]');
+        if (fold) return foldSet(fold.dataset.foldToggle, !isShut(fold.dataset.foldToggle));
+
+        /* The heading is a target too — a 16px chevron is a small thing to
+           ask somebody to hit. Anything that is itself a control inside the
+           head keeps its own click. */
+        const head = event.target.closest('[data-fold] > .card-head');
+        if (head && !event.target.closest('button, a, input, select, textarea')) {
+            const key = head.parentElement.dataset.fold;
+            return foldSet(key, !isShut(key));
+        }
 
         if (hit('data-rec-back')) return closeRec();
 

@@ -6251,18 +6251,25 @@ function fillCatSelect(selected) {
 
 function addCat() {
     const taken = new Set(db.cats.map((c) => c.tone));
-    db.cats.push({
+    const row = {
         id: newId('c'),
         label: 'New category',
         mark: '\u{1F516}',
         tone: TONE_ORDER.find((t) => !taken.has(t)) || 'slate',
-    });
+    };
+    db.cats.push(row);
     save();
     repaint();
+
     /* Straight into the name, because "New category" is a placeholder and
-       everybody's next move is to replace it. */
-    const box = $('catList').querySelector('.cat-row:last-child .cat-name');
+       everybody's next move is to replace it — but only when that list is
+       what you are looking at. Pressed from the record form it is behind a
+       folded card further down, and yanking the caret there mid-edit is
+       worse than leaving it alone. */
+    const list = $('catList');
+    const box = list && list.offsetParent ? list.querySelector('.cat-row:last-child .cat-name') : null;
     if (box) { box.focus(); box.select(); }
+    return row.id;
 }
 
 /* Deletes on the spot. Asking first was asking permission to do nothing in
@@ -7229,6 +7236,15 @@ function start() {
     $('tripTypeAdd').addEventListener('click', () => {
         const id = addType(kinOf(newKind).scope);
         fillTypeSelect(kinOf(newKind).scope, id);
+    });
+
+    /* Adding a calendar from the form picks it as well as makes it: you
+       pressed this because the one you wanted was not in the list. */
+    $('tripCatAdd').addEventListener('click', () => {
+        const id = addCat();
+        fillTripCatSelect(id);
+        $('tripCat').focus();
+        toast('Added a calendar · name and colour it under <b>Categories</b> on this screen.');
     });
 
     $('tripCoverAdd').addEventListener('click', () => $('tripCoverFile').click());

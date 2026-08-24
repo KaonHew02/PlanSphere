@@ -971,7 +971,18 @@ function closeRec() {
     open, and whatever the sidebar last chose when it is not. */
 const liveSection = () => (openRec && trip() ? subTab : live);
 
+/* Which of the three palettes the page is wearing. A record you have opened
+   turns the whole app its colour, and Home takes the colour of whatever it
+   is showing you — the screens that are about no one record (the shelf, the
+   calendar, the converter) stay on Trip, which is the default. */
+function paintKin() {
+    const t = trip();
+    const inside = (openRec && t) || (live === 'dash' && t);
+    document.documentElement.dataset.kin = inside ? (t.kind || 'trip') : 'trip';
+}
+
 function paintRecBar() {
+    paintKin();
     const t = trip();
     const open = openRec && !!t && live === 'trips';
     const bar = $('recBar');

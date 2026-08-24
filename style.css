@@ -24,59 +24,72 @@
 :root {
     color-scheme: light;
 
-    --canvas:      #f1f5fb;   /* the page: white with enough blue in it to be a colour */
+    --canvas:      #f5f2f7;   /* the page: white with a plum cast, not a blue one */
     --paper:       #ffffff;
-    --paper-2:     #f7faff;   /* nested rows, sitting inside a card */
+    --paper-2:     #faf7fa;   /* nested rows, sitting inside a card */
 
-    --ink:         #0f294d;   /* deep navy, not black */
-    --ink-2:       #46628a;
-    --ink-3:       #5d7498;   /* captions and table heads — 4.8:1 on paper */
-    --ink-4:       #8d9fba;   /* placeholders, and the quietest table cell */
-    --muted:       #5d7498;
+    --ink:         #2c1b3d;   /* deep plum, not black */
+    --ink-2:       #5d4a70;
+    --ink-3:       #746084;   /* captions and table heads — 5.5:1 on paper */
+    --ink-4:       #9c8aa8;   /* placeholders, and the quietest table cell */
+    --muted:       #7a6689;
 
-    --line:        #e2e9f4;
-    --line-2:      #eff3fa;
-    --line-strong: #d4deed;   /* the rule above a total */
-    --row-line:    #f3f7fc;   /* between rows of a list or table */
-    --field-line:  #d8e2f0;
+    --line:        #e6dfe9;
+    --line-2:      #f0ebf3;
+    --line-strong: #d8cede;   /* the rule above a total */
+    --row-line:    #f5f1f7;   /* between rows of a list or table */
+    --field-line:  #dcd2e2;
 
-    --track:       #e7edf7;   /* the empty part of a bar */
-    --track-2:     #cfdcee;   /* and the leftover slice of a stacked one */
+    --track:       #eae2ee;   /* the empty part of a bar */
+    --track-2:     #d6c9dd;   /* and the leftover slice of a stacked one */
 
     /* --------------------------------------------------------------------
-       The brand blue, and the one it hands off to.
+       The brand coral, and the two it hands off to.
 
-       One hue, three jobs, because contrast decides which blue can do what.
+       Still named azure, and deliberately: the name is the *role* — the one
+       hue this app spends on its own controls — and every rule below is
+       written against it. Renaming forty declarations to say coral would
+       change nothing on screen and would have to happen again the next time
+       the palette moves.
 
-       `--azure-vivid` (#287dfa) is the brand blue — the cornflower everyone
-       recognises. Against white it is 3.9:1, which is fine for a *shape* and
-       not fine for a *word*, so it is spent only where nothing has to be
-       read on top of it: progress fills, the focus ring, a chart bar.
+       One hue, three jobs, because contrast decides which coral can do what.
 
-       `--azure` is that blue two steps down, and it is the one that fills a
+       `--azure-vivid` (#e2603c) is the brand coral at full strength. Against
+       white it is 3.4:1, which is fine for a *shape* and not fine for a
+       *word*, so it is spent only where nothing has to be read on top of it:
+       progress fills, the focus ring, a chart bar.
+
+       `--azure` is that coral a step down, and it is the one that fills a
        control carrying white words — the live tab, the primary button, the
-       chosen segment. 4.7:1, so a 13.5px label survives it.
+       chosen segment. 5.0:1, so a 13.5px label survives it.
 
-       `--azure-ink` is blue as a word on a pale ground. 6.6:1.
+       `--azure-ink` is coral as a word on a pale ground. 6.7:1.
 
        Shapes use --azure-vivid, fills-with-words use --azure, words use
        --azure-ink. The dark theme changes the values and nothing else.
        -------------------------------------------------------------------- */
-    --azure-vivid: #287dfa;   /* the brand blue. Graphics only — see below. */
-    --azure:       #1d70e6;   /* fills that carry white words — 4.7:1 */
-    --azure-2:     #1560cf;   /* the hover of a filled control */
-    --azure-soft:  #e8f1ff;
-    --azure-line:  #bcd8ff;
-    --azure-ink:   #1657c4;   /* azure as a word, not as a fill — 6.6:1 */
+    --azure-vivid: #e2603c;   /* the brand coral. Graphics only — see below. */
+    --azure:       #c2482c;   /* fills that carry white words — 5.0:1 */
+    --azure-2:     #a63a21;   /* the hover of a filled control */
+    --azure-soft:  #fdeee9;
+    --azure-line:  #f4c9ba;
+    --azure-ink:   #a3381f;   /* coral as a word, not as a fill — 6.7:1 */
     --on-azure:    #ffffff;
-    --azure-glow:  rgba(29, 112, 230, .28);
-    --azure-ring:  rgba(29, 112, 230, .2);    /* the focus halo on a field */
+    --azure-glow:  rgba(194, 72, 44, .28);
+    --azure-ring:  rgba(194, 72, 44, .2);     /* the focus halo on a field */
 
+    /* Kept cool on purpose. Every other hue here sits between plum and
+       coral, so the one thing whose whole job is to be unlike its
+       surroundings — the focus ring, the now-line, a chart rule — is the
+       complement rather than another warm. It is how the poster this
+       palette comes from works: a cyan sky behind an orange sun. */
     --lagoon:      #00a3e0;   /* highlight only — rules, charts, the live day */
     --lagoon-soft: #e0f4fd;
 
-    --node:        #ff6f2c;   /* the trip in progress. Rationed on purpose. */
-    --node-soft:   #fff0e6;
+    /* Was orange, which is now the brand. Magenta keeps "happening now"
+       a thing you notice rather than a thing that matches the buttons. */
+    --node:        #a5356f;   /* the trip in progress. Rationed on purpose. */
+    --node-soft:   #fbe9f3;
 
     /* Trip categories. A category has exactly one colour and keeps it
        everywhere it appears — the legend dot, the row icon, the budget bar
@@ -110,35 +123,36 @@
     --on-red:      #ffffff;
 
     --topbar:        rgba(255, 255, 255, .86);
-    --backdrop:      rgba(15, 41, 77, .48);
-    --scroll-shadow: rgba(15, 41, 77, .12);
+    --backdrop:      rgba(44, 27, 61, .48);
+    --scroll-shadow: rgba(44, 27, 61, .12);
 
-    /* The band carries five pieces of small white text, so its lightest
-       stop is chosen by what white can survive rather than by how bright the
-       blue can get: at #2060c2, pure white is 6.0:1 and the 82%-opacity
-       labels below clear 4.5:1. A stop any brighter and the captions on it
-       become decoration. */
-    --hero-a:   #2060c2;      /* the three stops of the hero band */
-    --hero-mid: #1a52a8;
-    --hero-b:   #123d80;
+    /* Sunset, and it runs plum → magenta → coral. The band carries five
+       pieces of small white text, so its lightest stop is chosen by what
+       white can survive rather than by how far into the orange it can get:
+       at #a53c24 pure white is 6.4:1 and the 82%-opacity labels below clear
+       4.5:1. The poster coral one stop brighter, #c9563f, is 4.3:1 — it
+       looks better and it cannot carry a caption, so it is not used. */
+    --hero-a:   #4a2a6d;      /* the three stops of the hero band */
+    --hero-mid: #8d3a6b;
+    --hero-b:   #a53c24;      /* the lightest, so white on it is 6.4:1 */
 
     --radius:      20px;
     --radius-sm:   12px;
-    --shadow:      0 1px 2px rgba(15, 41, 77, .05), 0 10px 28px rgba(15, 41, 77, .07);
-    --shadow-hero: 0 2px 6px rgba(22, 80, 184, .22), 0 18px 40px rgba(22, 80, 184, .24);
+    --shadow:      0 1px 2px rgba(44, 27, 61, .05), 0 10px 28px rgba(44, 27, 61, .07);
+    --shadow-hero: 0 2px 6px rgba(141, 58, 107, .22), 0 18px 40px rgba(141, 58, 107, .24);
 }
 
 /* --------------------------------------------------------------------------
    Dark theme.
 
    Only the tokens move — every rule below this block is written against them.
-   The ground is a blue-grey evening rather than neutral grey, so azure still
-   looks like it belongs to the same app and the hero band still reads as
-   water rather than as a coloured rectangle.
+   The ground is a plum evening rather than neutral grey, so the coral still
+   looks like it belongs to the same app and the hero band still reads as a
+   sky rather than as a coloured rectangle.
 
-   Azure, lagoon and the category colours are all lifted: the daylight values
-   were chosen to carry weight against white, and against a dark ground they
-   read as mud. The meanings do not move.
+   The coral, the lagoon and the category colours are all lifted: the
+   daylight values were chosen to carry weight against white, and against a
+   dark ground they read as mud. The meanings do not move.
 
    PlanSphere is a light app — `data-theme="light"` is written on <html> in
    index.html, so this block is off unless somebody asks for it. It is kept
@@ -150,47 +164,47 @@
 :root[data-theme="dark"] {
     color-scheme: dark;
 
-    /* A blue-grey evening, not a black one. The first pass sat at #071522,
-       a near-black, and every card on it looked like it was floating in a
-       hole. This ground is light enough to read as a surface, with the cards
-       resting on it rather than punched out of it. */
-    --canvas:      #131f33;
-    --paper:       #1b2b45;
-    --paper-2:     #223351;
+    /* A plum evening, not a black one. The first pass sat at a near-black
+       and every card on it looked like it was floating in a hole. This
+       ground is light enough to read as a surface, with the cards resting
+       on it rather than punched out of it. */
+    --canvas:      #1d1528;
+    --paper:       #2a1f38;
+    --paper-2:     #332745;
 
-    --ink:         #eaf1fb;
-    --ink-2:       #b3c5de;
-    --ink-3:       #8598b5;
-    --ink-4:       #6a7d99;
-    --muted:       #8598b5;
+    --ink:         #f3ecf7;
+    --ink-2:       #cbbcd8;
+    --ink-3:       #a291b0;
+    --ink-4:       #857395;
+    --muted:       #a291b0;
 
-    --line:        #2b3f5e;
-    --line-2:      #243550;
-    --line-strong: #3a5175;
-    --row-line:    #22334e;
-    --field-line:  #3a5175;
+    --line:        #423352;
+    --line-2:      #382b47;
+    --line-strong: #55446a;
+    --row-line:    #332745;
+    --field-line:  #55446a;
 
-    --track:       #263854;
-    --track-2:     #375072;
+    --track:       #3a2d4b;
+    --track-2:     #574568;
 
-    --azure-vivid: #63a4ff;
-    --azure:       #4f96ff;
-    --azure-2:     #6aa8ff;
-    --azure-soft:  #1c3560;
-    --azure-line:  #2f4f80;
-    --azure-ink:   #9ec8ff;
+    --azure-vivid: #ff8a63;
+    --azure:       #f5794f;
+    --azure-2:     #ff8f68;
+    --azure-soft:  #4a2418;
+    --azure-line:  #6d3826;
+    --azure-ink:   #ffab8c;
 
     /* The fill is lighter than the page here, so what sits on it is ink,
        not white. Same rule as daylight, read the other way up. */
-    --on-azure:    #0b1c33;
-    --azure-glow:  rgba(79, 150, 255, .34);
-    --azure-ring:  rgba(79, 150, 255, .26);
+    --on-azure:    #2e1206;
+    --azure-glow:  rgba(245, 121, 79, .34);
+    --azure-ring:  rgba(245, 121, 79, .26);
 
     --lagoon:      #3fc4ec;
     --lagoon-soft: #10394d;
 
-    --node:        #ff8a47;
-    --node-soft:   #3d2417;
+    --node:        #e878b0;
+    --node-soft:   #43203a;
 
     --sky:         #3fb3d8;
     --sky-soft:    #12384a;
@@ -202,8 +216,8 @@
     --teal-soft:   #103a37;
     --rose:        #e77ea6;
     --rose-soft:   #40202f;
-    --slate:       #93a8bd;
-    --slate-soft:  #22334b;
+    --slate:       #a99bb8;
+    --slate-soft:  #332745;
 
     --green:       #3cc094;
     --green-soft:  #113a2f;
@@ -213,16 +227,218 @@
     --red-ink:     #f7ada8;
     --red-2:       #f78d87;
 
-    --topbar:        rgba(27, 43, 69, .86);
-    --backdrop:      rgba(8, 16, 28, .6);
+    --topbar:        rgba(42, 31, 56, .86);
+    --backdrop:      rgba(18, 11, 26, .6);
     --scroll-shadow: rgba(0, 0, 0, .42);
 
-    --hero-a:   #2a5fa8;
-    --hero-mid: #235088;
-    --hero-b:   #1a3d68;
+    --hero-a:   #5c3785;
+    --hero-mid: #8e3f6d;
+    --hero-b:   #a34428;
 
     --shadow:      0 1px 2px rgba(0, 0, 0, .26), 0 10px 28px rgba(0, 0, 0, .3);
     --shadow-hero: 0 2px 6px rgba(0, 0, 0, .34), 0 18px 40px rgba(0, 0, 0, .4);
+}
+
+/* ==========================================================================
+   Three worlds, one for each kind
+
+   Sunset Departure above is the app's default and the Trip palette. An Event
+   and an Activity get their own, and `data-kin` on <html> says which is in
+   force: opening a record turns the whole app the colour of the thing you
+   opened, and the shelf, the calendar and the converter — which are about no
+   one record — stay on Trip.
+
+   Only the world moves. The ten category colours, green, red and the radii
+   are declared once above and are the same in all three, because Food has to
+   be the same amber whatever kind of thing it was bought for.
+
+   Each palette carries its own `--lagoon` and `--node`, picked to contrast
+   with that world's brand rather than to match it: a highlight that looks
+   like the primary button is not a highlight. Sunset's cool cyan would sit
+   on top of Long Haul's teal, so Long Haul takes coral instead.
+   ========================================================================== */
+
+/* --- Long Haul · the night crossing ------------------------------------- */
+:root[data-kin="event"] {
+    --canvas:      #eef3f4;
+    --paper:       #ffffff;
+    --paper-2:     #f6fafa;
+
+    --ink:         #0d2b33;
+    --ink-2:       #3d6570;
+    --ink-3:       #536f79;   /* 5.2:1 on paper, 4.6:1 on canvas */
+    --ink-4:       #8aa4ad;
+    --muted:       #5c7b85;
+
+    --line:        #dbe6e8;
+    --line-2:      #eaf1f2;
+    --line-strong: #c7d8db;
+    --row-line:    #eff5f6;
+    --field-line:  #cfdfe2;
+
+    --track:       #dde8ea;
+    --track-2:     #bfd3d7;
+
+    --azure-vivid: #12a0a8;   /* shapes only — 2.9:1 */
+    --azure:       #0d7d8c;   /* fills with white words — 4.9:1 */
+    --azure-2:     #0a6673;
+    --azure-soft:  #e2f2f4;
+    --azure-line:  #b4dbe0;
+    --azure-ink:   #0a626e;   /* as a word — 7.1:1 */
+    --on-azure:    #ffffff;
+    --azure-glow:  rgba(13, 125, 140, .28);
+    --azure-ring:  rgba(13, 125, 140, .2);
+
+    --lagoon:      #c2542e;   /* the warm one, against all this water */
+    --lagoon-soft: #fceee9;
+
+    --node:        #7d520d;
+    --node-soft:   #fbf1de;
+
+    --backdrop:      rgba(13, 43, 51, .48);
+    --scroll-shadow: rgba(13, 43, 51, .12);
+
+    --hero-a:   #08313f;
+    --hero-mid: #0d5566;
+    --hero-b:   #0b6874;      /* lightest stop — white on it is 6.5:1 */
+
+    --shadow:      0 1px 2px rgba(13, 43, 51, .05), 0 10px 28px rgba(13, 43, 51, .07);
+    --shadow-hero: 0 2px 6px rgba(13, 85, 102, .22), 0 18px 40px rgba(13, 85, 102, .24);
+}
+
+/* --- Field Notes · the expedition log ------------------------------------ */
+:root[data-kin="activity"] {
+    --canvas:      #eef0ea;
+    --paper:       #ffffff;
+    --paper-2:     #f7f8f4;
+
+    --ink:         #1f2a20;
+    --ink-2:       #4d5a4c;
+    --ink-3:       #616c5e;   /* 5.4:1 on paper, 4.7:1 on canvas */
+    --ink-4:       #98a396;
+    --muted:       #6b7768;
+
+    --line:        #dfe3d8;
+    --line-2:      #ecefe7;
+    --line-strong: #cdd3c3;
+    --row-line:    #f1f3ed;
+    --field-line:  #d5dbcb;
+
+    --track:       #e0e4da;
+    --track-2:     #c6cdb9;
+
+    --azure-vivid: #4e8a68;   /* shapes only — 3.5:1 */
+    --azure:       #3d6b52;   /* fills with white words — 6.1:1 */
+    --azure-2:     #325843;
+    --azure-soft:  #e8efe9;
+    --azure-line:  #bcd2c3;
+    --azure-ink:   #2f5741;   /* as a word — 7.9:1 */
+    --on-azure:    #ffffff;
+    --azure-glow:  rgba(61, 107, 82, .28);
+    --azure-ring:  rgba(61, 107, 82, .2);
+
+    --lagoon:      #8a4a86;   /* plum, so a rule is never mistaken for pine */
+    --lagoon-soft: #f4eaf3;
+
+    --node:        #8c4a1a;
+    --node-soft:   #f9eee4;
+
+    --backdrop:      rgba(31, 42, 32, .48);
+    --scroll-shadow: rgba(31, 42, 32, .12);
+
+    --hero-a:   #22392f;
+    --hero-mid: #2f5a45;
+    --hero-b:   #5c6529;      /* lightest stop — white on it is 6.3:1 */
+
+    --shadow:      0 1px 2px rgba(31, 42, 32, .05), 0 10px 28px rgba(31, 42, 32, .07);
+    --shadow-hero: 0 2px 6px rgba(47, 90, 69, .22), 0 18px 40px rgba(47, 90, 69, .24);
+}
+
+/* --- and the same two after dark ----------------------------------------- */
+:root[data-theme="dark"][data-kin="event"] {
+    --canvas:      #0e1e24;
+    --paper:       #142b33;
+    --paper-2:     #1b363f;
+
+    --ink:         #e8f3f5;
+    --ink-2:       #b0cad2;
+    --ink-3:       #85a3ac;
+    --ink-4:       #6a878f;
+    --muted:       #85a3ac;
+
+    --line:        #24444e;
+    --line-2:      #1e3b44;
+    --line-strong: #325a66;
+    --row-line:    #1b363f;
+    --field-line:  #325a66;
+
+    --track:       #1f3c45;
+    --track-2:     #2f5a66;
+
+    --azure-vivid: #4fd4e0;
+    --azure:       #3ec3d0;
+    --azure-2:     #5ad2dd;
+    --azure-soft:  #103c44;
+    --azure-line:  #1d5b66;
+    --azure-ink:   #85e2ea;
+    --on-azure:    #04222a;
+    --azure-glow:  rgba(62, 195, 208, .34);
+    --azure-ring:  rgba(62, 195, 208, .26);
+
+    --lagoon:      #ff8a5f;
+    --lagoon-soft: #3f2016;
+
+    --node:        #e8a63c;
+    --node-soft:   #3d2e12;
+
+    --backdrop:      rgba(5, 16, 20, .6);
+
+    --hero-a:   #0d4757;
+    --hero-mid: #0f5b6d;
+    --hero-b:   #127484;
+}
+
+:root[data-theme="dark"][data-kin="activity"] {
+    --canvas:      #161c15;
+    --paper:       #202920;
+    --paper-2:     #29332a;
+
+    --ink:         #ecf1ea;
+    --ink-2:       #bfcbbc;
+    --ink-3:       #94a291;
+    --ink-4:       #78856f;
+    --muted:       #94a291;
+
+    --line:        #37432f;
+    --line-2:      #2e392a;
+    --line-strong: #4a5840;
+    --row-line:    #29332a;
+    --field-line:  #4a5840;
+
+    --track:       #303b2c;
+    --track-2:     #4c5b44;
+
+    --azure-vivid: #7fc79a;
+    --azure:       #6cb98a;
+    --azure-2:     #80c79b;
+    --azure-soft:  #1e3a29;
+    --azure-line:  #315a41;
+    --azure-ink:   #a3d8b6;
+    --on-azure:    #0d1f14;
+    --azure-glow:  rgba(108, 185, 138, .34);
+    --azure-ring:  rgba(108, 185, 138, .26);
+
+    --lagoon:      #d093cc;
+    --lagoon-soft: #3a2439;
+
+    --node:        #e09354;
+    --node-soft:   #3d281a;
+
+    --backdrop:      rgba(9, 13, 9, .6);
+
+    --hero-a:   #2c4a3b;
+    --hero-mid: #3a6b52;
+    --hero-b:   #6b7733;
 }
 
 /* ==========================================================================

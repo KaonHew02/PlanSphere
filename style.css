@@ -496,24 +496,6 @@ h1, h2, h3, .brand-name, .hero-value {
 /* The trip everything on the page is about. It sits in the top bar rather
    than in each module because every module answers to it, and a control that
    six screens obey should not live inside one of them. */
-.trip-switch { display: flex; align-items: center; gap: 8px; margin-right: auto; }
-
-.trip-switch label {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-
-.trip-switch select {
-    width: auto;
-    min-width: 190px;
-    padding: 8px 12px;
-    font-size: 13.5px;
-    font-weight: 650;
-}
-
 .tools { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .stamp:hover { background: var(--azure-soft); color: var(--azure-ink); }
 .tools-sep { width: 1px; height: 20px; background: var(--line); }
@@ -691,6 +673,12 @@ h1, h2, h3, .brand-name, .hero-value {
 .card.is-bar { padding: 14px 18px; }
 .bar-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
+/* "Push me to the far end of the row" — an inline style until it had to stop
+   applying on a phone, where the row has wrapped and there is no far end to
+   be at. A segment sitting half-indented on a line of its own reads as
+   broken alignment rather than as right-alignment. */
+.bar-row > .is-end { margin-left: auto; }
+
 .bar-label {
     display: inline-flex;
     align-items: center;
@@ -807,7 +795,8 @@ h1, h2, h3, .brand-name, .hero-value {
    this rule does not inherit anything — it falls back to raw browser chrome
    and looks broken beside the others. Add new types here first. */
 input[type="text"], input[type="number"], input[type="date"], input[type="time"],
-input[type="search"], input[type="url"], select, textarea {
+input[type="search"], input[type="url"], input[type="tel"], input[type="email"],
+select, textarea {
     width: 100%;
     padding: 11px 14px;
     border: 1px solid var(--field-line);
@@ -1163,6 +1152,10 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     font-size: 15px;
 }
 
+/* A kind carries its own colour now, handed over as --cc/--cc-soft, because
+   a type somebody added five minutes ago has no stylesheet class to match. */
+.disc.is-tone { background: var(--cc-soft); color: var(--cc); }
+
 .disc.k-travel { background: var(--sky-soft);    color: var(--sky); }
 .disc.k-stay   { background: var(--violet-soft); color: var(--violet); }
 .disc.k-food   { background: var(--amber-soft);  color: var(--amber); }
@@ -1170,6 +1163,218 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .disc.k-shop   { background: var(--rose-soft);   color: var(--rose); }
 .disc.k-other  { background: var(--slate-soft);  color: var(--slate); }
 .disc.is-sm    { width: 30px; height: 30px; border-radius: 10px; font-size: 13px; }
+
+/* ==========================================================================
+   Bars on a phone
+
+   Every one of these rows is a label and one or two segmented controls, laid
+   out across the width. Below this the width is gone: the row wraps, and the
+   pieces stop being "across" anything — so they take the full line and the
+   buttons inside them share it evenly, which is the only arrangement that
+   still looks deliberate once there is one per line.
+   ========================================================================== */
+@media (max-width: 700px) {
+    .bar-row { gap: 10px; }
+    .bar-row > .is-end { margin-left: 0; }
+    .bar-row > .seg { width: 100%; }
+    .bar-row > .seg > button { flex: 1 1 0; min-width: 0; text-align: center; justify-content: center; }
+    /* A wrapping segment keeps its chips at their natural width: stretching
+       them means the one that wrapped alone becomes a full-width bar, which
+       reads as the selected one. */
+    .bar-row > .seg.is-wrap > button { flex: 0 1 auto; }
+    .bar-row > .new-wrap,
+    .bar-row > .new-wrap > .primary-btn { width: 100%; justify-content: center; }
+    .bar-row > .cal-nav { width: 100%; justify-content: space-between; }
+    .card-note.is-end { margin-left: 0; }
+}
+
+/* ==========================================================================
+   The scope bar
+
+   Which record the screen below is about, at the top of the four screens
+   that are about one. A row per kind rather than one long line of names,
+   because "which trip" and "which event" are different questions and the
+   answer to one is noise while you are asking the other. The kind label is
+   set in the same small caps the rest of the app labels a bar with.
+   ========================================================================== */
+.scope-card { padding: 14px 18px; }
+
+.scope-bar { display: flex; flex-direction: column; gap: 8px; }
+
+.scope-row {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+}
+
+.scope-row + .scope-row { padding-top: 8px; border-top: 1px solid var(--row-line); }
+
+.scope-kind {
+    padding-top: 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
+.scope-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.scope-chip {
+    padding: 7px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease;
+}
+
+.scope-chip:hover { border-color: var(--azure); color: var(--azure-ink); }
+
+/* The one that is on is filled rather than outlined: on a bar where every
+   chip is a live control, a border cannot carry "this is the one". */
+.scope-chip.is-on {
+    border-color: transparent;
+    background: var(--azure);
+    color: #fff;
+    font-weight: 700;
+}
+
+.scope-chip.is-on:hover { color: #fff; }
+
+@media (max-width: 700px) {
+    .scope-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .scope-kind { padding-top: 0; }
+}
+
+/* ==========================================================================
+   The date field
+
+   A text box reading dd-mm-yyyy with the month grid behind the button, in
+   place of the native date input — see app.js for why the native one had to
+   go. It is styled as one control rather than two, because that is what it
+   is: the button is a way into the same value the box holds.
+   ========================================================================== */
+.date-field { position: relative; display: flex; align-items: center; min-width: 0; }
+
+.date-text { width: 100%; padding-right: 42px; font-variant-numeric: tabular-nums; }
+
+.date-open {
+    position: absolute;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 15px;
+    cursor: pointer;
+    transition: background .12s ease;
+}
+
+.date-open:hover { background: var(--azure-soft); color: var(--azure-ink); }
+
+.date-pop {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 60;
+    width: 268px;
+    padding: 12px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+
+/* Near the right-hand edge of a two-column grid the popup would hang off the
+   card, so the last column opens leftward instead. */
+.field:last-child .date-pop,
+.field-pair > *:last-child .date-pop { left: auto; right: 0; }
+
+.dp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.dp-head b { font-size: 13.5px; font-weight: 700; }
+
+.dp-step {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+
+.dp-step:hover { background: var(--azure-soft); color: var(--azure-ink); }
+
+.dp-week,
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+.dp-week span {
+    padding: 4px 0;
+    color: var(--ink-3);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.dp-grid button {
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.dp-grid button:hover { background: var(--azure-soft); }
+.dp-grid button.is-now { color: var(--azure-ink); font-weight: 750; }
+.dp-grid button.is-on { background: var(--azure); color: #fff; font-weight: 700; }
+
+.dp-foot {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--row-line);
+}
+
+.dp-act {
+    flex: 1;
+    padding: 7px 0;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.dp-act:hover { border-color: var(--azure); color: var(--azure-ink); }
 
 /* ==========================================================================
    Itinerary — days down the page, stops inside them
@@ -1437,8 +1642,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 
 @media (max-width: 900px) {
     .topbar { gap: 12px; padding: 12px 18px; flex-wrap: wrap; }
-    .trip-switch { order: 3; width: 100%; margin-right: 0; }
-    .trip-switch select { flex: 1 1 auto; min-width: 0; }
     .sidebar { padding: 10px 16px; }
 
     .main { padding: 18px 16px 48px; }
@@ -1734,15 +1937,40 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 /* ==========================================================================
    Week and Day — the same time grid, one column or seven
    ========================================================================== */
-.cal-grid-wrap { overflow-x: auto; }
-
-.cal-grid {
-    display: grid;
-    grid-template-columns: 56px repeat(var(--cols, 7), minmax(94px, 1fr));
+/* The frame is on the wrapper, not on the grid. It used to be on the grid,
+   which meant the grid also carried `overflow: hidden` for its rounded
+   corners — and a grid that clips its own overflow cannot be scrolled past.
+   On a phone that hid Friday, Saturday and Sunday behind an edge with no way
+   to reach them: seven columns of 78px need 590px and the card is 303px.
+   The wrapper scrolls now, and the grid is allowed to be wider than it. */
+.cal-grid-wrap {
+    overflow-x: auto;
     border: 1px solid var(--line);
     border-radius: 12px;
-    overflow: hidden;
-    min-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+/* Width is the sum of the columns' own minimums, or the card, whichever is
+   larger — never the content's max-content width, which lets a long event
+   title stretch a 1fr track and drags a desktop grid 600px past its card. */
+.cal-grid {
+    --gutter: 56px;
+    --colmin: 94px;
+    display: grid;
+    grid-template-columns: var(--gutter) repeat(var(--cols, 7), minmax(var(--colmin), 1fr));
+    min-width: max(100%, calc(var(--gutter) + var(--cols, 7) * var(--colmin)));
+}
+
+/* The hour column rides along. Scrolling sideways to Sunday and finding the
+   times had scrolled away with Monday is the whole grid becoming unreadable
+   at exactly the point it is being read. */
+.cal-corner,
+.cal-allday-label,
+.cal-hours {
+    position: sticky;
+    left: 0;
+    z-index: 2;
 }
 
 .cal-corner, .cal-head {
@@ -1896,7 +2124,7 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     .cal-chip { height: 6px; border-radius: 3px; background: var(--cc); border-left: 0; }
     .cal-chip.is-span .n { display: none; }
 
-    .cal-grid { grid-template-columns: 44px repeat(var(--cols, 7), minmax(78px, 1fr)); }
+    .cal-grid { --gutter: 44px; --colmin: 78px; }
     .cal-hour { padding: 0 5px; font-size: 9.5px; }
 
     .cal-row { grid-template-columns: 56px 30px minmax(0, 1fr) auto; gap: 8px 10px; }
@@ -3071,30 +3299,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
    People & participants
    ========================================================================== */
 
-/* The headcount, for an event. A trip does not get one: on a trip
-   everybody is coming, and three figures saying so is furniture. */
-.head-count {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.hc-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 12px 15px;
-    border-radius: var(--radius-sm);
-    background: var(--paper-2);
-}
-
-.hc-label { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.hc-cell b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.hc-cell b.is-plus { color: var(--green); }
-.hc-cell b.is-minus { color: var(--red); }
-.hc-cell b.is-idle { color: var(--ink-4); }
-
 .people-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
 
 .person-card {
@@ -3114,14 +3318,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .pc-body { min-width: 0; }
 .pc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pc-top h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
-
-.pc-role {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: var(--azure-ink);
-}
 
 .pc-reach { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 
@@ -3726,6 +3922,13 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 
 .cat-row + .cat-row { border-top: 1px solid var(--row-line); }
 
+/* One column more than a category row: the icon is picked from a list rather
+   than typed, so it needs a control instead of a text field. */
+.kind-row { grid-template-columns: 62px minmax(0, 1fr) auto auto auto 30px; }
+.kind-row > .disc { justify-self: center; }
+.kind-icon { padding: 8px 10px; font-size: 13px; }
+
+
 /* The mark is one glyph doing the work of a word, so its field is sized for
    one glyph and centred like a stamp rather than like text. */
 .cat-mark {
@@ -3774,6 +3977,14 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     .tone-pick { grid-area: tone; }
     .cat-use { grid-area: use; }
     .cat-row .row-x { grid-area: x; }
+
+    /* One row more than a category: the icon picker needs a line of its own
+       once the columns have collapsed. */
+    .kind-row {
+        grid-template-areas: "mark name x" ".    icon icon" ".    tone tone" ".    use  use";
+    }
+    .kind-row > .disc { grid-area: mark; }
+    .kind-icon { grid-area: icon; }
 }
 
 /* ==========================================================================

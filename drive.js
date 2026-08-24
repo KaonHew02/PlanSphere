@@ -408,6 +408,17 @@
      * pressing**. What must never happen is silence *and* a broken backup —
      * that one case is the whole reason this exists.
      */
+    /* dd-mm-yyyy HH:MM. Written out here rather than borrowed from app.js
+       because this file is the same file in three apps and has to stand on
+       its own — and toLocaleString() was printing 8/21/2026 on a browser set
+       to the US, which is the one thing the app's date format exists to
+       stop. */
+    function stampWhen(d) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return pad(d.getDate()) + '-' + pad(d.getMonth() + 1) + '-' + d.getFullYear()
+            + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
     function showStamp() {
         const el = $('driveStamp');
         const line = $('driveWhen');
@@ -448,14 +459,14 @@
         /* A week without a copy is worth interrupting for; anything less is not. */
         if (days >= 7) {
             return show('warn', '<i class="bi bi-cloud-slash-fill"></i>',
-                'The last copy went to Drive on ' + then.toLocaleString() + '.',
-                'The last copy went up ' + when + ', on ' + then.toLocaleString() + '. If Auto is on, '
+                'The last copy went to Drive on ' + stampWhen(then) + '.',
+                'The last copy went up ' + when + ', on ' + stampWhen(then) + '. If Auto is on, '
                 + 'Google has probably stopped signing you in without being asked — one press fixes it.');
         }
 
         show('ok', '<i class="bi bi-cloud-check-fill"></i>',
-            'In Drive, ' + when + ' · ' + then.toLocaleString(),
-            'In Drive, ' + when + ' — ' + then.toLocaleString() + '.');
+            'In Drive, ' + when + ' · ' + stampWhen(then),
+            'In Drive, ' + when + ' — ' + stampWhen(then) + '.');
     }
 
     /* ------------------------------------------------------------------ *

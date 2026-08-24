@@ -36,7 +36,7 @@
                 <i class="bi bi-calendar3"></i><span>Calendar</span><em class="count" id="countToday" hidden></em>
             </button>
             <button type="button" data-module="trips">
-                <i class="bi bi-suitcase-lg-fill"></i><span>Trips &amp; Events</span><em class="count" id="countTrips" hidden></em>
+                <i class="bi bi-suitcase-lg-fill"></i><span>Activities</span><em class="count" id="countTrips" hidden></em>
             </button>
             <button type="button" data-module="plan">
                 <i class="bi bi-calendar2-week-fill"></i><span>Itinerary</span><em class="count" id="countStops" hidden></em>
@@ -76,13 +76,6 @@
                 aria-controls="sidebar" aria-expanded="false">
             <i class="bi bi-list"></i><span id="navToggleLabel">Menu</span>
         </button>
-
-        <!-- Every module answers to this one control, so it lives above all of
-             them rather than inside whichever screen happened to need it first. -->
-        <div class="trip-switch" id="tripSwitch" hidden>
-            <label for="tripPick" id="tripLabel">Viewing</label>
-            <select id="tripPick"></select>
-        </div>
 
         <!-- Everything here is about the *second* copy: a file you keep, and
              a file in your own Google Drive. The working store is the browser,
@@ -165,7 +158,7 @@
                             <button type="button" class="ghost-btn" id="calNext" title="Forward"><i class="bi bi-chevron-right"></i></button>
                         </div>
                         <h2 class="cal-title" id="calTitle">&mdash;</h2>
-                        <div class="seg is-compact" id="calView" data-value="month" style="margin-left:auto">
+                        <div class="seg is-compact is-end" id="calView" data-value="month">
                             <button type="button" data-val="month" class="is-on">Month</button>
                             <button type="button" data-val="week">Week</button>
                             <button type="button" data-val="day">Day</button>
@@ -216,89 +209,9 @@
                         </div>
                     </div>
                     <div id="calBody"></div>
-                    <p class="hint" id="calHint"><i class="bi bi-info-circle"></i>Drag an activity onto another day to move it. Trips are bars across their dates and move from the Trips screen.</p>
+                    <p class="hint" id="calHint"><i class="bi bi-info-circle"></i>Drag an entry onto another day to move it. Trips, events and activities are bars across their dates and move from the Activities screen.</p>
                 </section>
 
-                <section class="card">
-                    <div class="card-head">
-                        <h2 id="actFormTitle">Add an activity</h2>
-                        <div class="card-actions">
-                            <button type="button" class="ghost-btn" id="actCancel" hidden>
-                                <i class="bi bi-x-lg"></i>Cancel
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="field-grid">
-                        <div class="field">
-                            <label for="actCat">Category</label>
-                            <select id="actCat"></select>
-                        </div>
-                        <div class="field">
-                            <label for="actDate">Date</label>
-                            <input type="date" id="actDate">
-                        </div>
-                        <div class="field">
-                            <label for="actTime">Starts <span class="per">leave empty for all day</span></label>
-                            <input type="time" id="actTime">
-                        </div>
-                        <div class="field">
-                            <label for="actEnd">Ends <span class="per">optional</span></label>
-                            <input type="time" id="actEnd">
-                        </div>
-                        <div class="field is-wide">
-                            <label for="actTitle">What</label>
-                            <input type="text" id="actTitle" placeholder="Company CSR day">
-                        </div>
-                        <div class="field">
-                            <label for="actWhere">Where <span class="per">optional</span></label>
-                            <input type="text" id="actWhere" placeholder="Head office, level 3">
-                        </div>
-                        <div class="field">
-                            <label for="actRemind">Remind me</label>
-                            <select id="actRemind">
-                                <option value="">No reminder</option>
-                                <option value="0">At the time</option>
-                                <option value="10">10 minutes before</option>
-                                <option value="30">30 minutes before</option>
-                                <option value="60">1 hour before</option>
-                                <option value="1440">1 day before</option>
-                            </select>
-                        </div>
-                        <div class="field is-wide">
-                            <label for="actNote">Note <span class="per">optional</span></label>
-                            <textarea id="actNote" placeholder="Anything you will want to read on the day."></textarea>
-                        </div>
-                    </div>
-
-                    <div class="form-foot">
-                        <button type="button" class="primary-btn" id="actSave">
-                            <i class="bi bi-plus-lg"></i><span id="actSaveLabel">Add activity</span>
-                        </button>
-                        <button type="button" class="ghost-btn" id="actGoogle" hidden
-                                title="Opens Google Calendar with this activity filled in">
-                            <i class="bi bi-google"></i>Add to Google Calendar
-                        </button>
-                        <button type="button" class="ghost-btn is-danger" id="actDrop" hidden>
-                            <i class="bi bi-trash3"></i>Delete
-                        </button>
-                        <p class="hint"><i class="bi bi-info-circle"></i>Trips, itinerary stops and bookings appear here on their own &mdash; they are added on their own screens.</p>
-                    </div>
-                </section>
-
-                <section class="card">
-                    <div class="card-head">
-                        <h2>Categories</h2>
-                        <div class="card-actions">
-                            <span class="card-note" id="catNote"></span>
-                            <button type="button" class="ghost-btn" id="catAdd">
-                                <i class="bi bi-plus-lg"></i>Add category
-                            </button>
-                        </div>
-                    </div>
-                    <div id="catList"></div>
-                    <p class="hint"><i class="bi bi-info-circle"></i>Changes save as you type. The Trip category is filled automatically from your trips, so it cannot be deleted &mdash; but it can be renamed and recoloured like any other.</p>
-                </section>
 
             </div>
         </section>
@@ -389,6 +302,14 @@
 
             <div class="stack">
 
+                <!-- Which record these figures belong to. Painted from the
+                     store and grouped by kind, because a trip, an event and
+                     an activity are three different questions and a flat run
+                     of names leaves you working out which is which. -->
+                <section class="card is-bar scope-card" id="sumScopeCard" hidden>
+                    <div class="scope-bar" id="sumScope"></div>
+                </section>
+
                 <section class="card">
                     <div class="card-head">
                         <h2 id="sumTitle">At a glance</h2>
@@ -471,7 +392,7 @@
                             </div>
                         </div>
 
-                        <div class="seg is-compact is-wrap" id="tripFilter" data-value="all" style="margin-left:auto">
+                        <div class="seg is-compact is-wrap is-end" id="tripFilter" data-value="all">
                             <button type="button" data-val="all" class="is-on">All</button>
                             <button type="button" data-val="trip">&#x1F30E; Trips</button>
                             <button type="button" data-val="event">&#x1F389; Events</button>
@@ -569,10 +490,91 @@
 
                 <section class="card">
                     <div class="card-head">
-                        <h2 id="tripsTitle">Trips &amp; events</h2>
+                        <h2 id="tripsTitle">All activities</h2>
                         <span class="card-note" id="tripsNote"></span>
                     </div>
                     <div id="tripsList"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2 id="actFormTitle">Add a calendar entry</h2>
+                        <div class="card-actions">
+                            <button type="button" class="ghost-btn" id="actCancel" hidden>
+                                <i class="bi bi-x-lg"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field">
+                            <label for="actCat">Category</label>
+                            <select id="actCat"></select>
+                        </div>
+                        <div class="field">
+                            <label for="actDate">Date</label>
+                            <input type="date" id="actDate">
+                        </div>
+                        <div class="field">
+                            <label for="actTime">Starts <span class="per">leave empty for all day</span></label>
+                            <input type="time" id="actTime">
+                        </div>
+                        <div class="field">
+                            <label for="actEnd">Ends <span class="per">optional</span></label>
+                            <input type="time" id="actEnd">
+                        </div>
+                        <div class="field is-wide">
+                            <label for="actTitle">What</label>
+                            <input type="text" id="actTitle" placeholder="Dentist, 3pm">
+                        </div>
+                        <div class="field">
+                            <label for="actWhere">Where <span class="per">optional</span></label>
+                            <input type="text" id="actWhere" placeholder="Head office, level 3">
+                        </div>
+                        <div class="field">
+                            <label for="actRemind">Remind me</label>
+                            <select id="actRemind">
+                                <option value="">No reminder</option>
+                                <option value="0">At the time</option>
+                                <option value="10">10 minutes before</option>
+                                <option value="30">30 minutes before</option>
+                                <option value="60">1 hour before</option>
+                                <option value="1440">1 day before</option>
+                            </select>
+                        </div>
+                        <div class="field is-wide">
+                            <label for="actNote">Note <span class="per">optional</span></label>
+                            <textarea id="actNote" placeholder="Anything you will want to read on the day."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-foot">
+                        <button type="button" class="primary-btn" id="actSave">
+                            <i class="bi bi-plus-lg"></i><span id="actSaveLabel">Add entry</span>
+                        </button>
+                        <button type="button" class="ghost-btn" id="actGoogle" hidden
+                                title="Opens Google Calendar with this activity filled in">
+                            <i class="bi bi-google"></i>Add to Google Calendar
+                        </button>
+                        <button type="button" class="ghost-btn is-danger" id="actDrop" hidden>
+                            <i class="bi bi-trash3"></i>Delete
+                        </button>
+                        <p class="hint"><i class="bi bi-info-circle"></i>A one-line entry that only lives on the calendar &mdash; a time, a place, a reminder. Something with a budget, a plan or a bill is a Trip, an Event or an Activity above.</p>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Categories</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="catNote"></span>
+                            <button type="button" class="ghost-btn" id="catAdd">
+                                <i class="bi bi-plus-lg"></i>Add category
+                            </button>
+                        </div>
+                    </div>
+                    <div id="catList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>The colours everything is drawn in on the Calendar. Changes save as you type. The Trip category is filled automatically, so it cannot be deleted &mdash; but it can be renamed and recoloured like any other.</p>
                 </section>
 
                 <section class="card">
@@ -599,17 +601,21 @@
 
             <div class="stack">
 
+                <!-- Which record these figures belong to. Painted from the
+                     store and grouped by kind, because a trip, an event and
+                     an activity are three different questions and a flat run
+                     of names leaves you working out which is which. -->
+                <section class="card is-bar scope-card" id="planScopeCard" hidden>
+                    <div class="scope-bar" id="planScope"></div>
+                </section>
+
                 <section class="card is-bar">
                     <div class="bar-row">
                         <span class="bar-label"><i class="bi bi-funnel"></i> Show</span>
-                        <div class="seg is-wrap" id="planFilter" data-value="all">
-                            <button type="button" data-val="all" class="is-on">All days</button>
-                            <button type="button" data-val="travel">Travel</button>
-                            <button type="button" data-val="stay">Stays</button>
-                            <button type="button" data-val="food">Food</button>
-                            <button type="button" data-val="do">Activities</button>
-                        </div>
-                        <div class="seg is-compact is-wrap" id="planState" data-value="live" style="margin-left:auto">
+                        <!-- Painted from db.stopKinds, so a type you add or
+                             rename appears here without a second edit. -->
+                        <div class="seg is-wrap" id="planFilter" data-value="all"></div>
+                        <div class="seg is-compact is-wrap is-end" id="planState" data-value="live">
                             <button type="button" data-val="live" class="is-on">Still on</button>
                             <button type="button" data-val="all">Everything</button>
                         </div>
@@ -633,14 +639,7 @@
                         </div>
                         <div class="field">
                             <label for="stopKind">Activity type</label>
-                            <select id="stopKind">
-                                <option value="travel">Travel</option>
-                                <option value="stay">Stay</option>
-                                <option value="food">Food</option>
-                                <option value="do" selected>Activity</option>
-                                <option value="shop">Shopping</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <select id="stopKind"></select>
                         </div>
                         <div class="field">
                             <label for="stopTime">Start time <span class="per">optional</span></label>
@@ -724,10 +723,24 @@
 
                 <section class="card">
                     <div class="card-head">
-                        <h2>The plan</h2>
+                        <h2 id="planTitle">The plan</h2>
                         <span class="card-note" id="planNote"></span>
                     </div>
                     <div id="planDays"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-head">
+                        <h2>Activity types</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="kindNote"></span>
+                            <button type="button" class="ghost-btn" id="kindAdd">
+                                <i class="bi bi-plus-lg"></i>Add type
+                            </button>
+                        </div>
+                    </div>
+                    <div id="kindList"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Names save as you type. These are the types on every stop and every booking, and the colours they are drawn in &mdash; the Show bar above is this same list. Deleting one files its stops under <b>Other</b>, which is why Other stays.</p>
                 </section>
 
             </div>
@@ -753,12 +766,7 @@
                     <div class="field-grid">
                         <div class="field">
                             <label for="bookKind">Kind</label>
-                            <select id="bookKind">
-                                <option value="travel" selected>Flight or transport</option>
-                                <option value="stay">Stay</option>
-                                <option value="do">Activity or ticket</option>
-                                <option value="other">Other</option>
-                            </select>
+                            <select id="bookKind"></select>
                         </div>
                         <div class="field">
                             <label for="bookDate">Date</label>
@@ -824,12 +832,21 @@
         <section class="module" id="module-spend" hidden>
 
             <div class="stack">
+
+                <!-- Which record these figures belong to. Painted from the
+                     store and grouped by kind, because a trip, an event and
+                     an activity are three different questions and a flat run
+                     of names leaves you working out which is which. -->
+                <section class="card is-bar scope-card" id="spendScopeCard" hidden>
+                    <div class="scope-bar" id="spendScope"></div>
+                </section>
+
                 <section class="card is-bar">
                     <div class="bar-row">
                         <button type="button" class="primary-btn" id="spendAdd">
                             <i class="bi bi-plus-lg"></i>Add expense
                         </button>
-                        <span class="card-note" id="spendNote" style="margin-left:auto"></span>
+                        <span class="card-note is-end" id="spendNote"></span>
                     </div>
                 </section>
 
@@ -943,7 +960,7 @@
 
                 <section class="card">
                     <div class="card-head">
-                        <h2>Expenses</h2>
+                        <h2 id="spendTitle">Expenses</h2>
                         <div class="card-actions">
                             <span class="card-note" id="spendListNote"></span>
                         </div>
@@ -981,25 +998,11 @@
                         </div>
                     </div>
 
-                    <div class="head-count" id="peopleCount" hidden></div>
-
                     <div class="person-form" id="personForm" hidden>
                         <div class="field-grid">
                             <div class="field is-wide">
                                 <label for="personName">Name</label>
                                 <input type="text" id="personName" placeholder="Alice Tan">
-                            </div>
-                            <div class="field">
-                                <label for="personRole">Role</label>
-                                <div class="field-pair">
-                                    <select id="personRole"></select>
-                                    <button type="button" class="ghost-btn is-narrow" id="personRoleAdd"
-                                            title="Add a role of your own">&#xFF0B;&nbsp;Add role</button>
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label for="personStatus">Status</label>
-                                <select id="personStatus"></select>
                             </div>
                             <div class="field">
                                 <label for="personPhone">Phone <span class="per">optional</span></label>
@@ -1296,20 +1299,6 @@
                     <p class="hint"><i class="bi bi-info-circle"></i>Ten to start with, and they are rows rather than a fixed list &mdash; rename them, recolour them, add your own.</p>
                 </section>
 
-                <section class="card">
-                    <div class="card-head">
-                        <h2>Roles</h2>
-                        <div class="card-actions">
-                            <span class="card-note" id="roleNote"></span>
-                            <button type="button" class="ghost-btn" id="roleAdd">
-                                <i class="bi bi-plus-lg"></i>Add role
-                            </button>
-                        </div>
-                    </div>
-                    <div id="roleList"></div>
-                    <p class="hint"><i class="bi bi-info-circle"></i>Names save as you type. Deleting one leaves the people who held it without a role rather than taking them with it.</p>
-                </section>
-
             </div>
         </section>
 
@@ -1325,6 +1314,14 @@
         <section class="module" id="module-budget" hidden>
 
             <div class="stack">
+
+                <!-- Which record these figures belong to. Painted from the
+                     store and grouped by kind, because a trip, an event and
+                     an activity are three different questions and a flat run
+                     of names leaves you working out which is which. -->
+                <section class="card is-bar scope-card" id="budgetScopeCard" hidden>
+                    <div class="scope-bar" id="budgetScope"></div>
+                </section>
 
                 <section class="card">
                     <div class="card-head">

@@ -182,10 +182,14 @@ function fillCurSelect(el, selected) {
    -------------------------------------------------------------------- */
 const DAY_MS = 86400000;
 
-function today() {
-    const d = new Date();
+/** A Date back to the 'YYYY-MM-DD' every record in the store is written in. */
+function isoOf(d) {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     return d.getFullYear() + '-' + m + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function today() {
+    return isoOf(new Date());
 }
 
 function asDate(iso) {
@@ -207,25 +211,36 @@ function shiftDate(iso, days) {
     const d = asDate(iso);
     if (!d) return '';
     d.setDate(d.getDate() + days);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + String(d.getDate()).padStart(2, '0');
+    return isoOf(d);
+}
+
+/** Whole months, landing on the first — what a month picker steps by. */
+function shiftMonth(iso, by) {
+    const d = asDate(iso) || new Date();
+    return isoOf(new Date(d.getFullYear(), d.getMonth() + by, 1));
+}
+
+/* One date format in the whole app, and it is dd-mm-yyyy. The weekday
+   stays in front of it because "which day of the week" is most of why an
+   itinerary gets looked at, and a number cannot answer that. */
+function fmtNum(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = String(iso).split('-');
+    if (!y || !m || !d) return '—';
+    return d + '-' + m + '-' + y;
 }
 
 function fmtDay(iso) {
     const d = asDate(iso);
     if (!d) return '—';
-    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + fmtNum(iso);
 }
 
 function fmtRange(from, to) {
     if (!from || !to) return '—';
-    const a = asDate(from);
-    const b = asDate(to);
-    if (!a || !b) return '—';
-    const sameYear = a.getFullYear() === b.getFullYear();
-    const left = a.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
-    const right = b.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    return left + ' – ' + right;
+    /* An arrow rather than a dash: the dates are full of hyphens now, and a
+       dash between them read as part of the second one. */
+    return fmtNum(from) + ' → ' + fmtNum(to);
 }
 
 /** 09:30 → 9:30 am. An empty time is a stop with no time, not midnight. */
@@ -250,17 +265,40 @@ function plural(n, one, many) {
    label, the icon and the colour class all come from it — so a category
    can never mean one colour on the Itinerary and another on the Budget.
    -------------------------------------------------------------------- */
-const KINDS = {
-    travel: { label: 'Travel',    icon: 'bi-airplane-fill',  cls: 'travel' },
-    stay:   { label: 'Stay',      icon: 'bi-building-fill',  cls: 'stay' },
-    food:   { label: 'Food',      icon: 'bi-cup-hot-fill',   cls: 'food' },
-    do:     { label: 'Activity',  icon: 'bi-camera-fill',    cls: 'do' },
-    shop:   { label: 'Shopping',  icon: 'bi-bag-fill',       cls: 'shop' },
-    other:  { label: 'Other',     icon: 'bi-three-dots',     cls: 'other' },
-};
+const DEFAULT_STOP_KINDS = [
+    { id: 'travel', label: 'Travel',   icon: 'bi-airplane-fill', tone: 'sky' },
+    { id: 'stay',   label: 'Stay',     icon: 'bi-building-fill', tone: 'violet' },
+    { id: 'food',   label: 'Food',     icon: 'bi-cup-hot-fill',  tone: 'amber' },
+    { id: 'do',     label: 'Activity', icon: 'bi-camera-fill',   tone: 'teal' },
+    { id: 'shop',   label: 'Shopping', icon: 'bi-bag-fill',      tone: 'rose' },
+    { id: 'other',  label: 'Other',    icon: 'bi-three-dots',    tone: 'slate', locked: true },
+];
 
-const KIND_ORDER = ['travel', 'stay', 'food', 'do', 'shop', 'other'];
-const kindOf = (k) => KINDS[k] || KINDS.other;
+/* Rows in the store now, not a constant — the same call the categories and
+   the trip types already made. Six words chosen by somebody else are a
+   guess at how a person plans, and a guess is a limit the moment it is
+   wrong. "Other" is the one that cannot go: it is where a deleted kind's
+   stops land, and a row has to have somewhere to be. */
+const OTHER_KIND = DEFAULT_STOP_KINDS[DEFAULT_STOP_KINDS.length - 1];
+
+const kindOf = (k) => (db.stopKinds || []).find((r) => r.id === k)
+    || (db.stopKinds || []).find((r) => r.id === 'other')
+    || OTHER_KIND;
+
+/** The icons a kind may wear. A fixed set, because a free text field asking
+    for a Bootstrap class name is a field nobody can fill. */
+const KIND_ICONS = [
+    ['bi-airplane-fill', 'Plane'],   ['bi-train-front-fill', 'Train'],
+    ['bi-bus-front-fill', 'Bus'],    ['bi-car-front-fill', 'Car'],
+    ['bi-building-fill', 'Hotel'],   ['bi-house-door-fill', 'House'],
+    ['bi-cup-hot-fill', 'Food'],     ['bi-camera-fill', 'Sightseeing'],
+    ['bi-bag-fill', 'Shopping'],     ['bi-ticket-perforated-fill', 'Ticket'],
+    ['bi-music-note-beamed', 'Music'], ['bi-controller', 'Games'],
+    ['bi-tree-fill', 'Outdoors'],    ['bi-water', 'Water'],
+    ['bi-heart-fill', 'Wellbeing'],  ['bi-briefcase-fill', 'Work'],
+    ['bi-people-fill', 'People'],    ['bi-star-fill', 'Special'],
+    ['bi-three-dots', 'Plain'],
+];
 
 const STATUS = {
     idea: { label: 'Idea', tag: 'is-amber' },
@@ -270,7 +308,10 @@ const STATUS = {
 
 function disc(kind, small) {
     const k = kindOf(kind);
-    return '<span class="disc k-' + k.cls + (small ? ' is-sm' : '') + '"><i class="bi ' + k.icon + '"></i></span>';
+    /* The colour rides on the row rather than on a stylesheet class, because
+       a kind somebody added five minutes ago has no class to ride on. */
+    return '<span class="disc is-tone' + (small ? ' is-sm' : '') + '" style="' + tone(k) + '">'
+        + '<i class="bi ' + k.icon + '"></i></span>';
 }
 
 function emptyState(icon, title, line) {
@@ -294,7 +335,7 @@ const KEY = 'plansphere.v2';
    data taking up somebody's quota. */
 const OLD_KEYS = ['plansphere.v1'];
 
-let db = { trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [], notes: [], spend: [], spendCats: [], docs: [], roles: [], settle: [], homeCountry: 'MY', current: null, saved: null };
+let db = { trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [], stopKinds: [], notes: [], spend: [], spendCats: [], docs: [], settle: [], homeCountry: 'MY', current: null, saved: null };
 
 /* The records live in IndexedDB when there is one — see store.js for why.
    `held` and `keep` are the only two places in the app that touch a
@@ -325,7 +366,7 @@ function load() {
         /* A corrupt or unavailable store is not a crash — the session
            simply starts empty and the next save repairs it. */
     }
-    ['trips', 'stops', 'books', 'packs', 'events', 'cats', 'types', 'notes', 'spend', 'spendCats', 'docs', 'roles', 'settle'].forEach((k) => {
+    ['trips', 'stops', 'books', 'packs', 'events', 'cats', 'types', 'stopKinds', 'notes', 'spend', 'spendCats', 'docs', 'settle'].forEach((k) => {
         if (!Array.isArray(db[k])) db[k] = [];
     });
 
@@ -342,12 +383,21 @@ function load() {
        does not resurrect all ten. */
     if (!db.types.length) db.types = DEFAULT_TYPES.map((t) => Object.assign({}, t));
 
+    /* Stop kinds were six constants until they were a list. A store written
+       before that has none, and one that has lost "Other" gets it back —
+       every stop and booking whose kind was deleted is filed there. */
+    if (!db.stopKinds.length) db.stopKinds = DEFAULT_STOP_KINDS.map((k) => Object.assign({}, k));
+    if (!db.stopKinds.some((k) => k.id === 'other')) db.stopKinds.push(Object.assign({}, OTHER_KIND));
+
     /* Trips predate the three kinds, so a stored row that says nothing is a
        trip. Its status is read off its dates once, here, and is a stored
        field from then on — the app stops guessing the moment you set it. */
     db.trips.forEach((t) => {
         if (!t.kind) t.kind = 'trip';
         if (!t.status) t.status = statusFromDates(t);
+        /* And a dated status that the calendar has moved past is corrected
+           here, once, so the file an Export writes says what is true. */
+        t.status = liveStatus(t);
         if (typeof t.type !== 'string') t.type = '';
     });
 
@@ -355,22 +405,15 @@ function load() {
        once, and leave a list somebody has emptied on purpose empty. */
     if (!db.spendCats.length) db.spendCats = DEFAULT_SPEND_CATS.map((c) => Object.assign({}, c));
 
-    if (!db.roles.length) db.roles = DEFAULT_ROLES.map((r) => Object.assign({}, r));
-
     /* Only the overall budget is old. The other three are simply not set
        on a trip written before them, which is what "not measured" is. */
     db.trips.forEach((t) => { if (!t.catBudget || typeof t.catBudget !== 'object') t.catBudget = {}; });
 
     /* People are named on the Expenses screen, so a trip written before
-       that screen existed simply has none — and one named before they
-       carried a role or a status is registered and unroled. */
-    db.trips.forEach((t) => {
-        if (!Array.isArray(t.people)) t.people = [];
-        t.people.forEach((p) => {
-            if (typeof p.role !== 'string') p.role = '';
-            if (!p.status) p.status = 'registered';
-        });
-    });
+       that screen existed simply has none. A role and an attendance mark
+       used to hang off each of them; both are gone, and a store written
+       while they existed keeps its values harmlessly — nothing reads them. */
+    db.trips.forEach((t) => { if (!Array.isArray(t.people)) t.people = []; });
 
     /* Stops predate their status, and one that says nothing is still on. */
     db.stops.forEach((s) => { if (!s.status) s.status = 'planned'; });
@@ -402,6 +445,200 @@ const newId = (prefix) => prefix + '-' + Date.now().toString(36) + '-' + (idSeq+
 
 const trip = () => db.trips.find((t) => t.id === db.current) || null;
 const mine = (list) => list.filter((row) => row.trip === db.current);
+
+/* ====================================================================
+   THE DATE FIELD
+
+   A native <input type="date"> draws itself in the browser's locale, not
+   the page's: the same field reads 08/21/2026 on a machine set to the US
+   and 21/08/2026 on one set to Malaysia, and nothing the page can say
+   moves it — the lang attribute is ignored, and there is no CSS for it.
+   An app that has one date format cannot leave that to a setting nobody
+   knows they have, so the native control is swapped at boot for a text
+   field that reads dd-mm-yyyy for everybody, with the month grid this
+   app was already drawing put behind the button beside it.
+
+   The swap happens here rather than in the markup so the ISO value keeps
+   the id it always had. Every $('stopDate').value in this file still
+   reads and writes 'YYYY-MM-DD' and never learns any of this — the
+   accessor below is what keeps the two in step, because assigning to
+   .value is how the rest of the app fills a form and it fires no event.
+   ==================================================================== */
+const NATIVE_VALUE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+const WEEK_MARKS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+/** Reads back what somebody typed. Forgiving about the separator and about
+    a short year, strict about the order — dd-mm-yyyy is the whole point. */
+function parseTyped(text) {
+    const bits = String(text || '').trim().match(/^(\d{1,2})\D+(\d{1,2})\D+(\d{2,4})$/);
+    if (!bits) return '';
+    let year = Number(bits[3]);
+    if (year < 100) year += year < 70 ? 2000 : 1900;
+    const iso = String(year).padStart(4, '0')
+        + '-' + String(Number(bits[2])).padStart(2, '0')
+        + '-' + String(Number(bits[1])).padStart(2, '0');
+    /* A Date accepts the 31st of February and rolls it into March. Round-
+       tripping it is how you find out that is what just happened. */
+    const back = asDate(iso);
+    return back && isoOf(back) === iso ? iso : '';
+}
+
+function upgradeDateFields() {
+    document.querySelectorAll('input[type="date"]').forEach(makeDateField);
+}
+
+function makeDateField(el) {
+    const id = el.id;
+    const wrap = document.createElement('div');
+    wrap.className = 'date-field';
+
+    const text = document.createElement('input');
+    text.type = 'text';
+    text.className = 'date-text';
+    text.id = id + 'Text';
+    text.placeholder = 'dd-mm-yyyy';
+    text.autocomplete = 'off';
+    text.inputMode = 'numeric';
+    text.maxLength = 10;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'date-open';
+    btn.tabIndex = -1;
+    btn.setAttribute('aria-label', 'Pick from a calendar');
+    btn.innerHTML = '<i class="bi bi-calendar3"></i>';
+
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(text);
+    wrap.appendChild(btn);
+    wrap.appendChild(el);
+    el.type = 'hidden';
+
+    /* The label has to point at the field somebody can actually click into,
+       and the hidden one keeps the id everything else calls it by. */
+    const lab = document.querySelector('label[for="' + id + '"]');
+    if (lab) lab.setAttribute('for', text.id);
+    else text.setAttribute('aria-label', 'Date');
+
+    Object.defineProperty(el, 'value', {
+        configurable: true,
+        get() { return NATIVE_VALUE.get.call(this); },
+        set(v) {
+            NATIVE_VALUE.set.call(this, v || '');
+            text.value = v ? fmtNum(v) : '';
+            if (datePop && datePop.iso === this) paintDatePop();
+        },
+    });
+
+    /* Typing writes through as soon as it is a date, so Enter-to-save picks
+       up what is on screen without waiting for a blur that never comes. */
+    text.addEventListener('input', () => {
+        NATIVE_VALUE.set.call(el, parseTyped(text.value));
+    });
+
+    /* Leaving tidies: 1-9-26 comes back as 01-09-2026, and something that
+       never was a date is cleared rather than left sitting there. */
+    text.addEventListener('blur', () => {
+        const iso = parseTyped(text.value);
+        NATIVE_VALUE.set.call(el, iso);
+        text.value = iso ? fmtNum(iso) : '';
+    });
+
+    btn.addEventListener('click', () => toggleDatePop(el, wrap));
+
+    text.value = fmtNum(NATIVE_VALUE.get.call(el)).replace('—', '');
+}
+
+/* --------------------------------------------------------------------
+   The month grid behind the button
+   -------------------------------------------------------------------- */
+let datePop = null;
+
+function closeDatePop() {
+    if (!datePop) return;
+    datePop.el.remove();
+    datePop = null;
+}
+
+function toggleDatePop(iso, wrap) {
+    const same = datePop && datePop.iso === iso;
+    closeDatePop();
+    if (same) return;
+
+    const el = document.createElement('div');
+    el.className = 'date-pop';
+    datePop = { el, iso, cursor: iso.value || today() };
+    wrap.appendChild(el);
+    paintDatePop();
+}
+
+function paintDatePop() {
+    if (!datePop) return;
+
+    const first = datePop.cursor.slice(0, 8) + '01';
+    const d = asDate(first);
+    if (!d) return;
+
+    /* Monday-first, like the calendar screen: getDay() calls Sunday 0. */
+    const lead = (d.getDay() + 6) % 7;
+    const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const picked = datePop.iso.value;
+    const now = today();
+
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<span></span>';
+    for (let i = 1; i <= days; i++) {
+        const iso = first.slice(0, 8) + String(i).padStart(2, '0');
+        const mark = iso === picked ? ' class="is-on"' : (iso === now ? ' class="is-now"' : '');
+        cells += '<button type="button"' + mark + ' data-pick-day="' + iso + '">' + i + '</button>';
+    }
+
+    datePop.el.innerHTML =
+        '<div class="dp-head">'
+        +   '<button type="button" class="dp-step" data-pick-step="-1" aria-label="Previous month">'
+        +     '<i class="bi bi-chevron-left"></i></button>'
+        +   '<b>' + esc(fmtMonth(first)) + '</b>'
+        +   '<button type="button" class="dp-step" data-pick-step="1" aria-label="Next month">'
+        +     '<i class="bi bi-chevron-right"></i></button>'
+        + '</div>'
+        + '<div class="dp-week">' + WEEK_MARKS.map((w) => '<span>' + w + '</span>').join('') + '</div>'
+        + '<div class="dp-grid">' + cells + '</div>'
+        + '<div class="dp-foot">'
+        +   '<button type="button" class="dp-act" data-pick-day="' + now + '">Today</button>'
+        +   '<button type="button" class="dp-act" data-pick-clear="1">Clear</button>'
+        + '</div>';
+}
+
+function wireDatePop() {
+    document.addEventListener('click', (event) => {
+        const inside = event.target.closest('.date-pop');
+        if (!inside) {
+            /* The button has its own listener and would reopen what this
+               closes, so it is the one click left alone. */
+            if (!event.target.closest('.date-open')) closeDatePop();
+            return;
+        }
+        if (!datePop) return;
+
+        const step = event.target.closest('[data-pick-step]');
+        if (step) {
+            datePop.cursor = shiftMonth(datePop.cursor, Number(step.dataset.pickStep));
+            return paintDatePop();
+        }
+
+        const day = event.target.closest('[data-pick-day]');
+        if (day) {
+            datePop.iso.value = day.dataset.pickDay;
+            return closeDatePop();
+        }
+
+        if (event.target.closest('[data-pick-clear]')) {
+            datePop.iso.value = '';
+            closeDatePop();
+        }
+    });
+}
 
 /* ====================================================================
    NAVIGATION
@@ -492,6 +729,8 @@ const MODULES = {
     pack:   renderPack,
 };
 
+const SAVE_BTNS = ['actSave', 'tripSave', 'stopSave', 'bookSave', 'spendSave', 'packSave'];
+
 /* Home is where the app opens: "what have I got on" is the question
    people arrive with, and it is the one screen that answers it without
    adding anything up. */
@@ -515,36 +754,67 @@ function showModule(key) {
 
 /** Whatever is on screen, plus the two things that are always on screen. */
 function repaint() {
-    paintTripPick();
+    paintScopes();
     paintCounts();
     MODULES[live]();
 }
 
-function paintTripPick() {
-    const pick = $('tripPick');
-    const wrap = $('tripSwitch');
-    if (!pick) return;
+/* ====================================================================
+   THE SCOPE BAR
 
-    /* Grouped by kind, because the list now holds three sorts of thing and
-       a flat run of names would leave you working out which is which. */
-    pick.innerHTML = db.trips.length
-        ? KIN_ORDER.map((k) => {
-            const rows = db.trips.filter((t) => (t.kind || 'trip') === k);
-            if (!rows.length) return '';
-            return '<optgroup label="' + esc(kinOf(k).mark + ' ' + kinOf(k).many) + '">'
-                + rows.map((t) => '<option value="' + esc(t.id) + '">'
-                    + esc(t.name || 'Untitled ' + kinOf(k).label.toLowerCase()) + '</option>').join('')
-                + '</optgroup>';
-        }).join('')
-        : '<option value="">Nothing planned yet</option>';
-    if (db.current) pick.value = db.current;
+   Which record a screen is about. It used to be one <select> in the top
+   bar labelled "Viewing", three metres from the figures it governed, and
+   a control that far from its effect is a control nobody connects to the
+   effect — you read RM 6,000 and had to go looking for whose it was.
 
-    /* A select holding one option is a control that cannot do anything, and
-       one that cannot do anything still invites being tried. Below two trips
-       the whole switch goes: the name was stated here for a while and read as
-       a control that would not work. Which trip you are in is on the screen
-       that is about the trip. */
-    if (wrap) wrap.hidden = db.trips.length < 2;
+   So it moved into the four screens that answer to it, one bar each, and
+   it is grouped by kind on the way: a trip, an event and an activity are
+   three different questions, and a flat run of names leaves you working
+   out which of the three you are looking at. Nearest first inside each
+   row, like the shelf, because what is next is what you open.
+
+   `db.current` is untouched — every trip(), every mine(), every screen
+   below still reads exactly what it always read. Only the control moved,
+   and then multiplied by four.
+   ==================================================================== */
+const SCOPE_BARS = ['planScope', 'spendScope', 'budgetScope', 'sumScope'];
+
+function paintScopes() {
+    const rows = KIN_ORDER.map((k) => {
+        const list = db.trips.filter((t) => (t.kind || 'trip') === k).sort(sortNearest);
+        if (!list.length) return '';
+        const kin = kinOf(k);
+        return '<div class="scope-row">'
+            + '<span class="scope-kind">' + kin.mark + ' ' + esc(kin.many) + '</span>'
+            + '<div class="scope-chips">'
+            +   list.map((t) => '<button type="button" data-scope="' + esc(t.id) + '"'
+                    + ' class="scope-chip' + (t.id === db.current ? ' is-on' : '') + '"'
+                    + ' aria-pressed="' + (t.id === db.current ? 'true' : 'false') + '">'
+                    + esc(t.name || 'Untitled ' + kin.label.toLowerCase()) + '</button>').join('')
+            + '</div>'
+            + '</div>';
+    }).join('');
+
+    SCOPE_BARS.forEach((id) => {
+        const bar = $(id);
+        const card = $(id + 'Card');
+        if (bar) bar.innerHTML = rows;
+        /* Nothing planned at all and the bar is a frame around a gap. The
+           empty state each screen already draws says it better. */
+        if (card) card.hidden = !rows;
+    });
+
+    paintScopeTitles();
+}
+
+/** The heading says it as well as the bar does, because a heading is what
+    gets read and a chip is what gets pressed. */
+function paintScopeTitles() {
+    const t = trip();
+    const tail = t ? ' — ' + (t.name || 'Untitled') : '';
+    [['planTitle', 'The plan'], ['spendTitle', 'Expenses'],
+     ['budgetTitle', 'Where the budget stands'], ['sumTitle', 'At a glance']]
+        .forEach(([id, base]) => { if ($(id)) set(id, base + tail); });
 }
 
 /** A count on a nav row, hidden rather than zeroed — a 0 is furniture. */
@@ -707,7 +977,7 @@ function paintSumTop(t, sums, length) {
     const ty = typeOf(t.type);
     const left = sums.budget - sums.spent;
 
-    set('sumHeadNote', [ty && ty.label + ' ' + kin.label, statusOf(t.status).label]
+    set('sumHeadNote', [ty && ty.label + ' ' + kin.label, statusOf(liveStatus(t)).label]
         .filter(Boolean).join(' · '));
 
     html('sumTop', '<div class="dash-figures">'
@@ -742,27 +1012,18 @@ function paintSumEvent(t, sums) {
     $('sumEventCard').hidden = kin.scope !== 'event' || !people.length;
     if ($('sumEventCard').hidden) return;
 
-    const came = people.filter((p) => (p.status || 'registered') === 'attended').length;
-    const away = people.filter((p) => p.status === 'absent').length;
-    /* Over the people who came, not the people who signed up — the ones who
-       did not turn up are not what it cost. Before anybody is marked, the
-       roster is the best answer there is. */
-    const over = came || people.length;
-
-    set('sumEventNote', came
-        ? Math.round(came / people.length * 100) + '% turned up'
-        : 'nobody marked yet');
+    /* Attendance used to split this: cost over the people who came rather
+       than over the people who signed up. Nobody is marked any more, so the
+       roster is the only answer and it is the honest one. */
+    set('sumEventNote', plural(people.length, 'person', 'people') + ' named');
 
     html('sumEvent', '<div class="dash-figures">'
         + figure('Budget', sums.budget ? money(sums.budget, { round: true }) : '—',
             sums.budget ? '' : 'not set')
         + figure('Actual', money(sums.spent, { round: true }),
             plural(mine(db.spend).length, 'expense'))
-        + figure('Participants', String(people.length), 'registered')
-        + figure('Attendance', String(came),
-            away ? plural(away, 'absent', 'absent') : (came ? 'everybody came' : 'not marked yet'))
-        + figure('Cost / person', money(Math.round(sums.spent / over)),
-            came ? 'over the ' + came + ' who came' : 'over the whole roster')
+        + figure('People', String(people.length), 'on the list')
+        + figure('Cost / person', money(Math.round(sums.spent / people.length)), 'across the list')
         + '</div>');
 }
 
@@ -1084,10 +1345,18 @@ function catForKind(k) {
 /* --------------------------------------------------------------------
    Status
 
-   Six of them, and every one is a statement of intent rather than a fact
-   about the calendar. What the dates say — a countdown, or that it is
-   running now — is a separate line on the card, because a plan can be
-   Draft the week it happens and that is not a contradiction to fix.
+   Six of them, and they are two different kinds of thing.
+
+   Upcoming, Ongoing and Completed are facts about the calendar, and a
+   fact that has stopped being true is not a status — it is a stale
+   field. An activity that finished on Saturday still saying "Upcoming"
+   on Monday is the app being wrong about something anybody can see, so
+   those three re-read the dates every time they are shown.
+
+   Draft, Planning and Archived are somebody's intent, and the calendar
+   has no opinion about them: a plan can be Draft the week it happens,
+   and Archived is a decision, not a date. Those three stay exactly where
+   they were put, and nothing moves them but a person.
    -------------------------------------------------------------------- */
 const TRIP_STATUS = {
     draft:     { label: 'Draft',     tag: '' },
@@ -1100,6 +1369,16 @@ const TRIP_STATUS = {
 
 const STATUS_ORDER = ['draft', 'planning', 'upcoming', 'ongoing', 'completed', 'archived'];
 const statusOf = (s) => TRIP_STATUS[s] || TRIP_STATUS.planning;
+
+/** The three that answer to the calendar rather than to a person. */
+const DATED_STATUS = ['upcoming', 'ongoing', 'completed'];
+
+/** The status as it stands today: read off the dates when it is one of
+    the three that track them, and left alone when it is not. */
+function liveStatus(t) {
+    const said = t.status || 'planning';
+    return DATED_STATUS.indexOf(said) < 0 ? said : statusFromDates(t);
+}
 
 /** What the dates say, which is not the same question as the status. */
 function statusFromDates(t) {
@@ -1160,13 +1439,44 @@ function toggleNewMenu(open) {
     $('newOpen').setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
+/* The shelf reads nearest-first, because "what is next" is the question a
+   list of trips is asked. What is running now sits at the top, then what is
+   coming soonest, then what has just finished (newest first, since old news
+   ages out), and anything still without dates falls to the bottom by name.
+   The status a person picked by hand is ignored here on purpose — the dates
+   are what "nearest" means. */
+const NEAR_RANK = { ongoing: 0, upcoming: 1, completed: 2, draft: 3 };
+
+function sortNearest(a, b) {
+    const ra = NEAR_RANK[statusFromDates(a)];
+    const rb = NEAR_RANK[statusFromDates(b)];
+    if (ra !== rb) return ra - rb;
+
+    /* Undated things have nothing to compare but their names. */
+    if (ra === 3) return (a.name || '').localeCompare(b.name || '');
+
+    /* Running now: whichever ends first is the more urgent. */
+    if (ra === 0) return (a.to || a.from).localeCompare(b.to || b.from) || (a.name || '').localeCompare(b.name || '');
+
+    /* Coming up: soonest start first. Finished: latest end first. */
+    if (ra === 1) return a.from.localeCompare(b.from) || (a.name || '').localeCompare(b.name || '');
+    return (b.to || b.from).localeCompare(a.to || a.from) || (a.name || '').localeCompare(b.name || '');
+}
+
 function renderTrips() {
     paintTypes();
 
-    const all = db.trips;
+    /* The quick-entry form and the category list moved here off the
+       Calendar, so this screen keeps them fed. The Calendar still paints
+       them too — both are cheap, and neither screen may assume the other
+       ran first. */
+    paintCats();
+    if (!editAct) fillCatSelect($('actCat') ? $('actCat').value : 'personal');
+
+    const all = db.trips.slice().sort(sortNearest);
     const list = tripFilter === 'all' ? all : all.filter((t) => (t.kind || 'trip') === tripFilter);
 
-    set('tripsTitle', tripFilter === 'all' ? 'Trips & events' : kinOf(tripFilter).many);
+    set('tripsTitle', tripFilter === 'all' ? 'All activities' : kinOf(tripFilter).many);
     set('tripsNote', !all.length ? ''
         : (list.length === all.length ? all.length + ' in all' : list.length + ' of ' + all.length));
 
@@ -1189,13 +1499,13 @@ function renderTrips() {
    this" — the picture answers it before the words are read. */
 function tripCard(t) {
     const kin = kinOf(t.kind);
-    const st = statusOf(t.status);
+    const st = statusOf(liveStatus(t));
     const cur = t.home || 'MYR';
     const spent = spendOf(t.id);
     const over = t.budget && spent > t.budget;
 
-    /* What the dates say, next to what the status claims. Only shown when
-       it adds something the status does not already say. */
+    /* The tag says Upcoming; this says how long. A countdown is the part a
+       one-word status cannot carry, which is why both are on the card. */
     const real = statusFromDates(t);
     const out = t.from ? daysBetween(today(), t.from) : null;
     let clock = '';
@@ -1295,7 +1605,7 @@ function openTripForm(kind, id) {
     $('tripBudget').value = t && t.budget ? fromSen(t.budget) : '';
 
     fillTypeSelect(kin.scope, t ? t.type : '');
-    fillStatusSelect(t ? t.status : 'planning');
+    fillStatusSelect(t ? liveStatus(t) : 'planning');
     fillCurSelect($('tripHome'), t ? (t.home || 'MYR') : 'MYR');
     fillCountrySelect($('tripCountry'), t ? (t.country || '') : '');
 
@@ -1510,6 +1820,126 @@ function dropType(id) {
 }
 
 /* ====================================================================
+   THE ACTIVITY TYPE LIST
+
+   The kind on a stop is also the kind on a booking and the line a budget
+   is grouped by, so this one list is read from three screens. Editing it
+   is therefore editing all three at once, which is the point - the whole
+   reason the kind was declared once was so that "Food" could not mean one
+   colour on the Itinerary and another on the Budget.
+   ==================================================================== */
+function kindUse(id) {
+    return db.stops.filter((r) => (r.kind || 'do') === id).length
+        + db.books.filter((r) => (r.kind || 'travel') === id).length;
+}
+
+function paintStopKinds() {
+    const list = $('kindList');
+    if (!list) return;
+    set('kindNote', plural(db.stopKinds.length, 'type'));
+
+    /* Never rebuild a list somebody is typing in - the same guard the
+       categories and the trip types keep. */
+    if (list.contains(document.activeElement)) return;
+
+    html('kindList', db.stopKinds.map((k) => {
+        const used = kindUse(k.id);
+        return '<div class="cat-row kind-row" style="' + tone(k) + '">'
+            + '<span class="disc is-tone"><i class="bi ' + k.icon + '"></i></span>'
+            + '<input class="cat-name" type="text" aria-label="Name"'
+            +   ' data-kind-name="' + esc(k.id) + '" value="' + esc(k.label) + '">'
+            + '<select class="kind-icon" aria-label="Icon"'
+            +   ' data-kind-icon="' + esc(k.id) + '">'
+            +   KIND_ICONS.map((ic) => '<option value="' + ic[0] + '"'
+                    + (ic[0] === k.icon ? ' selected' : '') + '>' + esc(ic[1]) + '</option>').join('')
+            + '</select>'
+            + '<div class="tone-pick">'
+            +   TONE_ORDER.map((t) => '<button type="button" class="tone-dot' + (t === k.tone ? ' is-on' : '')
+                    + '" style="--tone:var(' + TONES[t][0] + ')" title="' + t + '"'
+                    + ' aria-label="' + t + '" data-kind-tone="' + esc(k.id) + ':' + t + '"></button>').join('')
+            + '</div>'
+            + '<span class="cat-use' + (used ? '' : ' is-idle') + '">'
+            +   (used ? plural(used, 'in use', 'in use') : 'not used') + '</span>'
+            + '<button type="button" class="row-x" data-drop-kind="' + esc(k.id) + '"'
+            +   (k.locked ? ' disabled title="Deleted types file their stops here, so it stays"' : ' title="Delete"')
+            +   '><i class="bi bi-trash3"></i></button>'
+            + '</div>';
+    }).join(''));
+}
+
+function addStopKind() {
+    const taken = new Set(db.stopKinds.map((k) => k.tone));
+    const row = {
+        id: newId('sk'),
+        label: 'New type',
+        icon: 'bi-three-dots',
+        tone: TONE_ORDER.find((t) => !taken.has(t)) || 'slate',
+    };
+    /* Above "Other", because Other is the end of a list by meaning as well
+       as by position. */
+    db.stopKinds.splice(Math.max(0, db.stopKinds.length - 1), 0, row);
+    save();
+    repaint();
+
+    const box = $('kindList').querySelector('[data-kind-name="' + row.id + '"]');
+    if (box) { box.focus(); box.select(); }
+}
+
+/* Deletes on the spot with the way back attached, like a category does.
+   What it takes with it is a label: the stops and bookings filed under it
+   move to Other rather than going anywhere. */
+function dropStopKind(id) {
+    const k = db.stopKinds.find((r) => r.id === id);
+    if (!k || k.locked) return;
+
+    const at = db.stopKinds.indexOf(k);
+    const stops = db.stops.filter((r) => (r.kind || 'do') === id);
+    const books = db.books.filter((r) => (r.kind || 'travel') === id);
+
+    db.stopKinds.splice(at, 1);
+    stops.forEach((r) => { r.kind = 'other'; });
+    books.forEach((r) => { r.kind = 'other'; });
+    if (planFilter === id) planFilter = 'all';
+    save();
+    repaint();
+
+    const moved = stops.length + books.length;
+    toast('Deleted <b>' + esc(k.label) + '</b>'
+        + (moved ? ' \u00b7 ' + plural(moved, 'row') + ' moved to Other' : ''), {
+        label: 'Undo',
+        run: () => {
+            db.stopKinds.splice(at, 0, k);
+            stops.forEach((r) => { r.kind = id; });
+            books.forEach((r) => { r.kind = id; });
+            save();
+            repaint();
+        },
+    });
+}
+
+/** Fills a kind <select>, keeping the asked-for value when it still exists. */
+function fillKindSelect(el, selected) {
+    if (!el) return;
+    el.innerHTML = db.stopKinds.map((k) =>
+        '<option value="' + esc(k.id) + '">' + esc(k.label) + '</option>').join('');
+    el.value = db.stopKinds.some((k) => k.id === selected) ? selected : 'other';
+}
+
+/** The Show bar is the same list with "All days" in front of it. */
+function paintPlanFilter() {
+    const bar = $('planFilter');
+    if (!bar) return;
+    if (planFilter !== 'all' && !db.stopKinds.some((k) => k.id === planFilter)) planFilter = 'all';
+
+    const chip = (val, label) => '<button type="button" data-val="' + esc(val) + '"'
+        + (val === planFilter ? ' class="is-on"' : '') + '>' + esc(label) + '</button>';
+
+    bar.dataset.value = planFilter;
+    bar.innerHTML = chip('all', 'All days')
+        + db.stopKinds.map((k) => chip(k.id, k.label)).join('');
+}
+
+/* ====================================================================
    MODULE 04 · SCHEDULE & ITINERARY
 
    Days down the page, stops inside them. A stop is the smallest unit the
@@ -1654,6 +2084,9 @@ function renderPlan() {
     }
 
     fillStopSources();
+    paintPlanFilter();
+    paintStopKinds();
+    if (!editStop) fillKindSelect($('stopKind'), $('stopKind').value || 'do');
 
     const all = mine(db.stops);
     const byKind = planFilter === 'all' ? all : all.filter((s) => s.kind === planFilter);
@@ -1825,7 +2258,7 @@ function clearStopForm() {
     ['stopTitle', 'stopWhere', 'stopTime', 'stopEnd', 'stopMins', 'stopCost', 'stopDesc', 'stopNote', 'stopActual']
         .forEach((id) => { $(id).value = ''; });
     $('stopDate').value = t ? t.from : '';
-    $('stopKind').value = 'do';
+    fillKindSelect($('stopKind'), 'do');
     fillStopStatus('planned');
     fillCurSelect($('stopCur'), homeCur());
     fillCurSelect($('stopActualCur'), homeCur());
@@ -1844,7 +2277,7 @@ function openStopEdit(id) {
     $('stopDate').value = s.date || '';
     $('stopTime').value = s.time || '';
     $('stopEnd').value = s.end || '';
-    $('stopKind').value = s.kind || 'do';
+    fillKindSelect($('stopKind'), s.kind || 'do');
     $('stopTitle').value = s.title || '';
     $('stopWhere').value = s.where || '';
     $('stopDesc').value = s.desc || '';
@@ -2336,6 +2769,11 @@ function paintNoteAtts() {
 let editBook = null;
 
 function renderBook() {
+    /* A booking carries the same `kind` a stop does and is read by the same
+       kindOf(), so it is offered the same list rather than a second one that
+       could drift out of step with it. */
+    fillKindSelect($('bookKind'), $('bookKind').value || 'travel');
+
     const t = trip();
     if (!t) {
         set('bookNote', '');
@@ -2414,7 +2852,7 @@ function clearBookForm() {
     const t = trip();
     ['bookTitle', 'bookWho', 'bookRef', 'bookCost'].forEach((id) => { $(id).value = ''; });
     $('bookDate').value = t ? t.from : '';
-    $('bookKind').value = 'travel';
+    fillKindSelect($('bookKind'), 'travel');
     $('bookStatus').value = 'held';
     fillCurSelect($('bookCur'), homeCur());
     set('bookFormTitle', 'Add a booking');
@@ -2426,7 +2864,7 @@ function openBookEdit(id) {
     const b = db.books.find((x) => x.id === id);
     if (!b) return;
     editBook = id;
-    $('bookKind').value = b.kind || 'travel';
+    fillKindSelect($('bookKind'), b.kind || 'travel');
     $('bookDate').value = b.date || '';
     $('bookStatus').value = b.status || 'held';
     $('bookCost').value = b.cost ? fromSen(b.cost) : '';
@@ -2453,31 +2891,6 @@ function openBookEdit(id) {
    anybody is named — a trip with four people on it and Members saying 2
    is a trip that is wrong.
    ==================================================================== */
-const DEFAULT_ROLES = [
-    { id: 'r-organizer',   label: 'Organizer' },
-    { id: 'r-participant', label: 'Participant' },
-    { id: 'r-guest',       label: 'Guest' },
-    { id: 'r-volunteer',   label: 'Volunteer' },
-    { id: 'r-employee',    label: 'Employee' },
-    { id: 'r-family',      label: 'Family' },
-    { id: 'r-friend',      label: 'Friend' },
-];
-
-const roleOf = (id) => db.roles.find((r) => r.id === id) || null;
-
-/* Three, and they are the three the headcount is made of: somebody said
-   they were coming, somebody came, somebody did not. Anything finer —
-   invited, maybe, declined — is a state of a conversation rather than a
-   state of the event, and the counts would stop adding up. */
-const PERSON_STATUS = {
-    registered: { label: 'Registered', tag: 'is-azure' },
-    attended:   { label: 'Attended',   tag: 'is-green' },
-    absent:     { label: 'Absent',     tag: 'is-red' },
-};
-
-const PERSON_STATUS_ORDER = ['registered', 'attended', 'absent'];
-const personStatusOf = (s) => PERSON_STATUS[s] || PERSON_STATUS.registered;
-
 let editPerson = null;
 
 const peopleOf = (t) => (t && Array.isArray(t.people) ? t.people : []);
@@ -2494,18 +2907,14 @@ function syncMembers(t) {
    ==================================================================== */
 function paintPeople() {
     const t = trip();
-    paintRoles();
 
     const list = peopleOf(t);
     set('peopleNote', t ? (list.length ? plural(list.length, 'person', 'people') : 'nobody named yet') : '');
 
     if (!t) {
-        $('peopleCount').hidden = true;
         return html('peopleList', emptyState('bi-people', 'Nothing open',
             'People belong to a trip, an event or an activity.'));
     }
-
-    paintHeadcount(t, list);
 
     if (!list.length) {
         return html('peopleList', emptyState('bi-people', 'Nobody named yet',
@@ -2515,30 +2924,7 @@ function paintPeople() {
     html('peopleList', '<div class="people-deck">' + list.map((p) => personCard(p, t)).join('') + '</div>');
 }
 
-/* The spec draws a trip as a list of names and an event as three
-   figures, which is the difference between the two: on a trip everybody
-   is coming, and on an event turning up is the question. */
-function paintHeadcount(t, list) {
-    const box = $('peopleCount');
-    const kin = kinOf(t.kind);
-    box.hidden = kin.scope !== 'event' || !list.length;
-    if (box.hidden) return;
-
-    /* Registered is the roster — 25 registered, of whom 22 came and 3 did
-       not, which is how the counts add up. A person still sitting at
-       Registered is one whose outcome nobody has recorded, and that is
-       the fourth figure rather than a fourth kind of person. */
-    const n = (k) => list.filter((p) => (p.status || 'registered') === k).length;
-    box.innerHTML = ''
-        + '<div class="hc-cell"><span class="hc-label">Registered</span><b>' + list.length + '</b></div>'
-        + '<div class="hc-cell"><span class="hc-label">Attended</span><b class="is-plus">' + n('attended') + '</b></div>'
-        + '<div class="hc-cell"><span class="hc-label">Absent</span><b class="is-minus">' + n('absent') + '</b></div>'
-        + '<div class="hc-cell"><span class="hc-label">Not yet marked</span><b class="is-idle">' + n('registered') + '</b></div>';
-}
-
 function personCard(p, t) {
-    const st = personStatusOf(p.status);
-    const role = roleOf(p.role);
     const paid = mine(db.spend).filter((x) => x.by === p.id);
     const inSplit = mine(db.spend).filter((x) => (x.who || []).includes(p.id)).length;
     const bal = balances(t).find((b) => b.person.id === p.id && !b.gone);
@@ -2549,8 +2935,6 @@ function personCard(p, t) {
         + '<div class="pc-body">'
         +   '<div class="pc-top">'
         +     '<h3>' + esc(p.name || 'Unnamed') + '</h3>'
-        +     (role ? '<span class="pc-role">' + esc(role.label) + '</span>' : '')
-        +     '<span class="tag ' + st.tag + '">' + esc(st.label) + '</span>'
         +   '</div>'
 
         +   (p.phone || p.email
@@ -2602,8 +2986,6 @@ function openPersonForm(id) {
     $('personPhone').value = p ? (p.phone || '') : '';
     $('personEmail').value = p ? (p.email || '') : '';
     $('personNote').value = p ? (p.note || '') : '';
-    fillRoleSelect(p ? p.role : 'r-participant');
-    fillPersonStatus(p ? p.status : 'registered');
 
     set('personSaveLabel', editPerson ? 'Save changes' : 'Add person');
     $('personSave').querySelector('i').className = 'bi ' + (editPerson ? 'bi-check-lg' : 'bi-plus-lg');
@@ -2627,8 +3009,6 @@ function savePerson() {
 
     const row = {
         name,
-        role: $('personRole').value || '',
-        status: $('personStatus').value || 'registered',
         phone: $('personPhone').value.trim(),
         email: $('personEmail').value.trim(),
         note: $('personNote').value.trim(),
@@ -2675,86 +3055,6 @@ function dropPerson(id) {
             back.people = peopleOf(back).slice();
             back.people.splice(at, 0, p);
             syncMembers(back);
-            save();
-            repaint();
-        },
-    });
-}
-
-function fillPersonStatus(selected) {
-    const el = $('personStatus');
-    if (!el) return;
-    el.innerHTML = PERSON_STATUS_ORDER
-        .map((k) => '<option value="' + k + '">' + esc(PERSON_STATUS[k].label) + '</option>').join('');
-    el.value = PERSON_STATUS[selected] ? selected : 'registered';
-}
-
-function fillRoleSelect(selected) {
-    const el = $('personRole');
-    if (!el) return;
-    el.innerHTML = '<option value="">No role</option>'
-        + db.roles.map((r) => '<option value="' + esc(r.id) + '">' + esc(r.label) + '</option>').join('');
-    el.value = db.roles.some((r) => r.id === selected) ? selected : '';
-}
-
-/* ====================================================================
-   ROLES
-
-   Seven to start with and the eighth is your own, which is what the spec
-   means by Custom — so they are rows rather than a fixed list, the same
-   as the trip types and the expense categories.
-   ==================================================================== */
-function paintRoles() {
-    set('roleNote', plural(db.roles.length, 'role'));
-    if ($('roleList').contains(document.activeElement)) return;
-
-    const t = trip();
-    html('roleList', '<div class="type-rows">' + db.roles.map((r) => {
-        const used = peopleOf(t).filter((p) => p.role === r.id).length;
-        return '<div class="type-row">'
-            + '<input type="text" class="type-name" aria-label="Role name"'
-            +   ' data-role-name="' + esc(r.id) + '" value="' + esc(r.label) + '">'
-            + '<span class="type-use' + (used ? '' : ' is-idle') + '">'
-            +   (used ? plural(used, 'person', 'people') : 'not used') + '</span>'
-            + '<button type="button" class="row-x" data-drop-role="' + esc(r.id) + '" title="Delete">'
-            +   '<i class="bi bi-trash3"></i></button>'
-            + '</div>';
-    }).join('') + '</div>');
-}
-
-function addRole() {
-    const row = { id: newId('r'), label: 'New role' };
-    db.roles.push(row);
-    save();
-    repaint();
-
-    const box = $('roleList').querySelector('[data-role-name="' + row.id + '"]');
-    if (box) { box.focus(); box.select(); }
-    return row.id;
-}
-
-/* Deletes on the spot with Undo. What it takes with it is a label — the
-   people who held it are still on the trip, still on their expenses, and
-   simply have no role until they are given another. */
-function dropRole(id) {
-    const r = roleOf(id);
-    if (!r) return;
-
-    const at = db.roles.indexOf(r);
-    const held = [];
-    db.trips.forEach((t) => peopleOf(t).forEach((p) => { if (p.role === id) held.push(p); }));
-
-    db.roles.splice(at, 1);
-    held.forEach((p) => { p.role = ''; });
-    save();
-    repaint();
-
-    toast('Deleted <b>' + esc(r.label) + '</b>'
-        + (held.length ? ' · ' + plural(held.length, 'person', 'people') + ' left without a role' : ''), {
-        label: 'Undo',
-        run: () => {
-            db.roles.splice(at, 0, r);
-            held.forEach((p) => { p.role = id; });
             save();
             repaint();
         },
@@ -4290,7 +4590,8 @@ function renderBudget() {
             'A budget belongs to a trip, an event or an activity.'));
     }
 
-    set('budgetTitle', 'Where the budget stands');
+    /* The title carries the record's name and is written by
+       paintScopeTitles(), so it is not rewritten here. */
     set('budgetCurTag', 'in ' + (t.home || 'MYR'));
     paintRates(t);
 
@@ -4887,7 +5188,7 @@ function psIsEmpty() {
 function psApply(bag) {
     db = Object.assign({
         trips: [], stops: [], books: [], packs: [], events: [], cats: [], types: [],
-        notes: [], spend: [], spendCats: [], docs: [], roles: [], settle: [], current: null,
+        notes: [], spend: [], spendCats: [], docs: [], settle: [], current: null,
     }, bag);
     if (!db.trips.some((t) => t.id === db.current)) db.current = db.trips.length ? db.trips[0].id : null;
     save();
@@ -5369,7 +5670,7 @@ function viewTimeline(list) {
 
     if (!shown.length) {
         return emptyState('bi-calendar2-week', 'Nothing ahead',
-            'Add an activity below, or plan a trip and its days will appear here.');
+            'Nothing here yet - add a calendar entry or a trip on the Activities screen.');
     }
 
     const dates = Array.from(new Set(shown.map((it) => it.date))).sort();
@@ -5650,7 +5951,7 @@ function paintCats() {
     }).join(''));
 }
 
-/** The activity form only offers categories a person can actually file
+/** The quick-entry form only offers categories a person can actually file
     something under — the system one fills itself. */
 function fillCatSelect(selected) {
     const el = $('actCat');
@@ -5691,7 +5992,7 @@ function dropCat(id) {
        filed under it. Nothing is deleted and the toast says why. */
     if (orphans.length && !moveTo) {
         return toast('<b>' + esc(cat.label) + '</b> still holds '
-            + plural(orphans.length, 'activity', 'activities')
+            + plural(orphans.length, 'entry', 'entries')
             + ' and there is no other category to move them to. Add one first.');
     }
 
@@ -5709,7 +6010,7 @@ function dropCat(id) {
 
     toast('Deleted <b>' + esc(cat.label) + '</b>'
         + (orphans.length
-            ? ' \u00b7 ' + plural(orphans.length, 'activity', 'activities')
+            ? ' \u00b7 ' + plural(orphans.length, 'entry', 'entries')
                 + ' moved to <b>' + esc(moveTo.label) + '</b>'
             : ''),
         { label: 'Undo', run: () => {
@@ -5837,7 +6138,7 @@ function openItem(key) {
     if (it.trip && it.trip !== db.current) {
         db.current = it.trip;
         save();
-        paintTripPick();
+        paintScopes();
         clearStopForm();
         clearBookForm();
     }
@@ -5885,17 +6186,23 @@ function clearActForm() {
     $('actDate').value = calCursor || today();
     fillCatSelect('personal');
     $('actRemind').value = '';
-    set('actFormTitle', 'Add an activity');
-    set('actSaveLabel', 'Add activity');
+    set('actFormTitle', 'Add a calendar entry');
+    set('actSaveLabel', 'Add entry');
     $('actCancel').hidden = true;
     const drop = $('actDrop');
     if (drop) drop.hidden = true;
     if ($('actGoogle')) $('actGoogle').hidden = true;
 }
 
+/* The form is on the Activities screen now, so editing something clicked on
+   the Calendar is a page change first. Same move as clicking a stop or a
+   booking makes — the screen that owns the record is the screen that edits
+   it, and the calendar stays a view of everything rather than a second
+   place to type. */
 function openActEdit(id) {
     const e = db.events.find((x) => x.id === id);
     if (!e) return;
+    if (live !== 'trips') showModule('trips');
     editAct = id;
     fillCatSelect(e.cat || 'personal');
     $('actDate').value = e.date || '';
@@ -5905,7 +6212,7 @@ function openActEdit(id) {
     $('actWhere').value = e.where || '';
     $('actNote').value = e.note || '';
     $('actRemind').value = e.remind == null ? '' : String(e.remind);
-    set('actFormTitle', 'Edit activity');
+    set('actFormTitle', 'Edit calendar entry');
     set('actSaveLabel', 'Save changes');
     $('actCancel').hidden = false;
     const drop = $('actDrop');
@@ -6376,12 +6683,17 @@ function boot() {
 }
 
 function start() {
+    /* Before anything fills a form: every $('...').value below is writing
+       through the accessor these put on the field. */
+    upgradeDateFields();
+    wireDatePop();
+
     load();
     fxLoad();
     holLoad();
     loadNav();
     paintStamp();
-    paintTripPick();
+    paintScopes();
     paintCounts();
     calCursor = today();
     clearTripForm();
@@ -6412,13 +6724,6 @@ function start() {
         if (navIsDrawer()) closeDrawer();
     });
 
-    $('tripPick').addEventListener('change', (event) => {
-        db.current = event.target.value || null;
-        save();
-        clearStopForm();
-        clearBookForm();
-        repaint();
-    });
 
     /* ---- Calendar ---- */
     $('calPrev').addEventListener('click', () => calStep(-1));
@@ -6455,6 +6760,17 @@ function start() {
         if (row) window.open(googleUrl(row), '_blank', 'noopener');
     });
     $('catAdd').addEventListener('click', addCat);
+    $('kindAdd').addEventListener('click', addStopKind);
+
+    document.addEventListener('change', (event) => {
+        const pick = event.target.closest('[data-kind-icon]');
+        if (!pick) return;
+        const k = db.stopKinds.find((r) => r.id === pick.dataset.kindIcon);
+        if (!k) return;
+        k.icon = pick.value;
+        save();
+        repaint();
+    });
 
     document.addEventListener('input', (event) => {
         const name = event.target.closest('[data-cat-name]');
@@ -6693,8 +7009,6 @@ function start() {
     $('peopleAdd').addEventListener('click', () => openPersonForm(null));
     $('personCancel').addEventListener('click', closePersonForm);
     $('personSave').addEventListener('click', savePerson);
-    $('personRoleAdd').addEventListener('click', () => fillRoleSelect(addRole()));
-    $('roleAdd').addEventListener('click', addRole);
     $('spendCatAdd').addEventListener('click', addSpendCat);
 
     $('spendSplit').addEventListener('click', (event) => {
@@ -6754,6 +7068,7 @@ function start() {
 
     /* Enter in a text field means "add the thing this form is for". */
     document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && datePop) return closeDatePop();
         if (event.key === 'Escape' && !$('askBox').hidden) return closeAsk();
         if (event.key === 'Escape' && !$('dataBox').hidden) return closeData();
         if (event.key === 'Escape' && !$('newMenu').hidden) return toggleNewMenu(false);
@@ -6770,8 +7085,13 @@ function start() {
         if (!form || event.target.tagName !== 'INPUT') return;
         /* The type and category lists are on the same screens as the forms
            but are not part of them — Enter there means "done", not "add". */
-        if (event.target.closest('#typeList, #catList, #roleList, #spendCatList, #spendParts, #budgetCats')) return event.target.blur();
-        const btn = { 'module-cal': 'actSave', 'module-trips': 'tripSave', 'module-plan': 'stopSave', 'module-book': 'bookSave', 'module-spend': 'spendSave', 'module-pack': 'packSave' }[form.id];
+        if (event.target.closest('#typeList, #catList, #kindList, #spendCatList, #spendParts, #budgetCats')) return event.target.blur();
+        /* The card you are typing in decides, and the module only answers
+           when the card does not — the Activities screen carries two forms
+           now, so "the form on this screen" stopped being one thing. */
+        const own = event.target.closest('.card');
+        const btn = (own && SAVE_BTNS.find((id) => own.querySelector('#' + id)))
+            || { 'module-trips': 'tripSave', 'module-plan': 'stopSave', 'module-book': 'bookSave', 'module-spend': 'spendSave', 'module-pack': 'packSave' }[form.id];
         if (btn) { event.preventDefault(); $(btn).click(); }
     });
 
@@ -6871,15 +7191,6 @@ function start() {
             return;
         }
 
-        const rName = event.target.closest('[data-role-name]');
-        if (rName) {
-            const r = roleOf(rName.dataset.roleName);
-            if (!r) return;
-            r.label = rName.value;
-            save();
-            return renderSpend();
-        }
-
         const scBox = event.target.closest('[data-sc-name], [data-sc-mark]');
         if (scBox) {
             const id = scBox.dataset.scName || scBox.dataset.scMark;
@@ -6889,6 +7200,18 @@ function start() {
             else row.mark = scBox.value;
             save();
             return renderSpend();
+        }
+
+        /* An activity type's name lands as it is typed too. The Show bar
+           and every disc on the page read this label, so they redraw - and
+           paintStopKinds() bails while the caret is in the row. */
+        const kindBox = event.target.closest('[data-kind-name]');
+        if (kindBox) {
+            const k = db.stopKinds.find((r) => r.id === kindBox.dataset.kindName);
+            if (!k) return;
+            k.label = kindBox.value;
+            save();
+            return renderPlan();
         }
 
         /* Type names land as they are typed, like a category's does. */
@@ -6941,6 +7264,17 @@ function start() {
         const dropC = hit('data-drop-cat');
         if (dropC) return dropCat(dropC);
 
+        const kindTone = hit('data-kind-tone');
+        if (kindTone) {
+            const [id, t] = kindTone.split(':');
+            const row = db.stopKinds.find((k) => k.id === id);
+            if (row) { row.tone = t; save(); repaint(); }
+            return;
+        }
+
+        const dropK = hit('data-drop-kind');
+        if (dropK) return dropStopKind(dropK);
+
         const cat = hit('data-cat');
         if (cat) {
             if (calOff.has(cat)) calOff.delete(cat); else calOff.add(cat);
@@ -6979,6 +7313,18 @@ function start() {
 
         const dropTy = hit('data-drop-type');
         if (dropTy) return dropType(dropTy);
+
+        /* A chip on a scope bar and Open on the shelf are the same act:
+           they change which record every screen is about. */
+        const scope = hit('data-scope');
+        if (scope && scope !== db.current) {
+            db.current = scope;
+            save();
+            clearStopForm();
+            clearBookForm();
+            return repaint();
+        }
+        if (scope) return;
 
         const open = hit('data-open-trip');
         if (open) {
@@ -7108,9 +7454,6 @@ function start() {
 
         const dropPP = hit('data-drop-person');
         if (dropPP) return dropPerson(dropPP);
-
-        const dropR = hit('data-drop-role');
-        if (dropR) return dropRole(dropR);
 
         const scTone = hit('data-sc-tone');
         if (scTone) {

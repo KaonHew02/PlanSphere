@@ -3727,6 +3727,18 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .st-name { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
 .st-who > i { font-size: 13px; color: var(--ink-4); margin: 0 2px; }
 
+/* Which expenses a transfer is made of. Only drawn when the figure is more
+   than one thing, or when part of it came back the other way — a transfer
+   that is one dinner is already named by the card it sits on. */
+.st-parts {
+    grid-column: 1 / -1;
+    margin: -2px 0 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
 .st-figure { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
 .st-figure b { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .st-left { font-size: 11.5px; font-weight: 600; color: var(--amber); font-variant-numeric: tabular-nums; }

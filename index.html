@@ -1299,8 +1299,26 @@
                 <section class="card">
                     <div class="card-head">
                         <h2>&#x1F4B8; Settlement</h2>
-                        <span class="card-note" id="settleNote"></span>
+                        <div class="card-actions">
+                            <span class="card-note" id="settleNote"></span>
+                            <button type="button" class="ghost-btn" id="settleCopy">
+                                <i class="bi bi-clipboard"></i>Copy summary
+                            </button>
+                        </div>
                     </div>
+
+                    <!-- Two honest ways to clear the same debts, and which one
+                         is right depends on the group rather than on the
+                         arithmetic — so the group picks. -->
+                    <div class="field is-wide" id="settleStyleField">
+                        <label>Who pays who</label>
+                        <div class="seg is-wrap" id="settleStyle" data-value="net">
+                            <button type="button" data-val="net" class="is-on">Fewest transfers</button>
+                            <button type="button" data-val="payer">Pay back whoever paid</button>
+                        </div>
+                        <p class="hint" id="settleStyleHint"><i class="bi bi-info-circle"></i></p>
+                    </div>
+
                     <div id="settleList"></div>
                     <p class="hint"><i class="bi bi-info-circle"></i>The transfers are worked out from the expenses every time this is drawn. What is stored is what has actually been handed over.</p>
                 </section>

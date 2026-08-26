@@ -3372,6 +3372,91 @@ function settlePlan(t) {
     return out.sort((a, b) => b.amount - a.amount);
 }
 
+/**
+ * Everybody pays back whoever paid, expense by expense.
+ *
+ * The other way round from `settlePlan`. That one asks "who is up, who is
+ * down" and matches the two sides off, which is the fewest transfers and the
+ * most arithmetic to take on trust: the figure somebody is handed bears no
+ * relation to anything they ate, and it can be owed to a person who bought
+ * them nothing. This one asks the question a table actually asks — *whose
+ * money paid for my dinner* — and answers it per expense, so every figure in
+ * the list is somebody's own share of one thing one person paid for.
+ *
+ * Two people who owe each other both ways still hand over **the difference**.
+ * You covered the taxi and they covered lunch; sending each other money
+ * across is not a settlement, it is two people doing a favour for a bank. The
+ * expenses on both sides stay on the transfer as `parts`, so the subtraction
+ * can be shown rather than asserted.
+ */
+function settlePerPayer(t) {
+    const named = {};
+    peopleOf(t).forEach((x) => { named[x.id] = x.name; });
+    const nameOf = (id) => named[id] || 'Someone (removed)';
+
+    /* Directed first: "A owes B", with the expenses that made it up. */
+    const owed = new Map();
+
+    mine(db.spend).forEach((x) => {
+        if (!x.by) return;
+        const { bag } = shareOut(x, t);
+        const label = (x.merchant || '').trim() || (x.desc || '').trim() || 'Expense';
+
+        Object.keys(bag).forEach((id) => {
+            if (id === x.by || bag[id] <= 0) return;
+            const key = id + ':' + x.by;
+            const row = owed.get(key) || { from: id, to: x.by, amount: 0, parts: [] };
+            row.amount += bag[id];
+            row.parts.push({ label, amount: bag[id] });
+            owed.set(key, row);
+        });
+    });
+
+    /* Then folded, so no pair ever sends money in both directions. */
+    const pairs = new Map();
+    owed.forEach((row) => {
+        const key = row.from < row.to ? row.from + ':' + row.to : row.to + ':' + row.from;
+        const pair = pairs.get(key) || {};
+        pair[row.from < row.to ? 'up' : 'down'] = row;
+        pairs.set(key, pair);
+    });
+
+    const out = [];
+    pairs.forEach((pair) => {
+        const up = pair.up;
+        const down = pair.down;
+        const upSen = up ? up.amount : 0;
+        const downSen = down ? down.amount : 0;
+        if (upSen === downSen) return;      /* square: nothing has to move */
+
+        const wins = upSen > downSen ? up : down;
+        const loses = upSen > downSen ? down : up;
+
+        out.push({
+            from: wins.from, fromName: nameOf(wins.from),
+            to: wins.to, toName: nameOf(wins.to),
+            amount: Math.abs(upSen - downSen),
+            parts: wins.parts.concat((loses ? loses.parts : [])
+                .map((part) => ({ label: part.label, amount: part.amount, back: true }))),
+        });
+    });
+
+    return out.sort((a, b) => a.fromName.localeCompare(b.fromName)
+        || b.amount - a.amount);
+}
+
+/** Whichever of the two the trip asks for. Netting unless it says otherwise. */
+function settleTransfers(t) {
+    return t && t.settleStyle === 'payer' ? settlePerPayer(t) : settlePlan(t);
+}
+
+/** What each person put down, biggest first. Empty when nobody has paid. */
+function settlePayers(t) {
+    return balances(t)
+        .filter((r) => r.paid > 0)
+        .sort((a, b) => b.paid - a.paid);
+}
+
 /* --------------------------------------------------------------------
    What has actually been handed over
 
@@ -3412,17 +3497,116 @@ function settleStatus(row, amount) {
     return 'pending';
 }
 
+/**
+ * The settlement, sized to paste into the group chat.
+ *
+ * Which is the whole brief, and it decides what is left out. On screen a
+ * settlement can afford to show its working — what each person put in, which
+ * expense made up which figure, what cancelled against what. Pasted into a
+ * chat that is a wall of arithmetic in front of the one thing anybody scrolls
+ * to: what do I send, and who to.
+ *
+ * So: three lines of context, then one transfer per line. Three, not none and
+ * not the lot — any more and it buries the line people are looking for, any
+ * less and the first reply is somebody asking where the figures came from.
+ */
+function settleSummaryText(t) {
+    if (!t) return '';
+
+    const cur = t.home || 'MYR';
+    const plan = settleTransfers(t);
+    const payers = settlePayers(t);
+    const spent = mine(db.spend).reduce((n, x) => n + homeOf({ cost: x.amount, cur: x.cur }, t), 0);
+
+    const lines = [(t.name || 'Trip') + ' — ' + moneyIn(spent, cur)];
+
+    if (payers.length) {
+        lines.push('Paid: ' + payers
+            .map((r) => r.person.name + ' ' + moneyIn(r.paid, cur)).join(' · '));
+    }
+    lines.push('(' + plural(mine(db.spend).length, 'expense') + ', '
+        + plural(peopleOf(t).length, 'person', 'people') + ')');
+    lines.push('');
+
+    if (!plan.length) {
+        lines.push('Everybody is square — nothing has to move.');
+        return lines.join('\n');
+    }
+
+    plan.forEach((tr) => {
+        const row = settleRow(t, tr.from, tr.to);
+        const state = settleStatus(row, tr.amount);
+        lines.push(tr.fromName + ' → ' + tr.toName + ' ' + moneyIn(tr.amount, cur)
+            + (state === 'paid' ? ' (paid)'
+                : state === 'cancelled' ? ' (cancelled)'
+                : state === 'partly' ? ' (' + moneyIn(Math.max(0, tr.amount - (row ? row.paid : 0)), cur) + ' left)'
+                : ''));
+    });
+
+    return lines.join('\n');
+}
+
+/** Which of the two ways is on, and the sentence saying what it does. */
+function paintSettleStyle(t) {
+    const seg = $('settleStyle');
+    if (!seg) return;
+
+    const payer = !!(t && t.settleStyle === 'payer');
+    seg.querySelectorAll('button').forEach((b) => b.classList.toggle('is-on', (b.dataset.val === 'payer') === payer));
+    html('settleStyleHint', '<i class="bi bi-info-circle"></i>' + (payer
+        ? 'Everybody pays back whoever paid for what they had, expense by expense. More transfers, '
+          + 'and no figure anybody has to take on trust. Where two of you owe each other, only the '
+          + 'difference moves.'
+        : 'Every share is netted against what that person put in, then the biggest debt is matched '
+          + 'to the biggest credit. The fewest transfers there are — but some of the money goes to '
+          + 'somebody who did not buy the thing being paid for.'));
+}
+
+/**
+ * Text onto the clipboard, and something on screen saying it went.
+ *
+ * `navigator.clipboard` is not there on an insecure origin, and a copy button
+ * that fails in silence is worse than one that is not offered — so the old
+ * way is kept behind it, and either way the reader is told.
+ */
+function copyText(text, said) {
+    const done = () => toast(said || 'Copied');
+    const fallback = () => {
+        const box = document.createElement('textarea');
+        box.value = text;
+        box.setAttribute('readonly', '');
+        box.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(box);
+        box.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+        box.remove();
+        if (ok) done();
+        else toast('Could not reach the clipboard — copy it by hand.');
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+        return;
+    }
+    fallback();
+}
+
 /* ====================================================================
    THE SCREEN
    ==================================================================== */
 function paintSettle(t) {
+    paintSettleStyle(t);
+    const styleField = $('settleStyleField');
+    if (styleField) styleField.hidden = !t;
+
     if (!t) {
         set('settleNote', '');
         return html('settleList', emptyState('bi-arrow-left-right', 'Nothing open',
             'A settlement belongs to a trip, an event or an activity.'));
     }
 
-    const plan = settlePlan(t);
+    const plan = settleTransfers(t);
 
     if (!plan.length) {
         const any = mine(db.spend).length;
@@ -3463,6 +3647,15 @@ function settleCard(r, t, cur) {
     const st = SETTLE_STATUS[r.state];
     const key = esc(r.tr.from) + ':' + esc(r.tr.to);
 
+    /* Which expenses this figure is made of. Only worth printing when there
+       is more than one, or when some of it came back the other way — a
+       single expense is already named by the transfer it produced. */
+    const bits = r.tr.parts || [];
+    const parts = bits.length > 1
+        ? bits.map((b) => (b.back ? 'less ' : '') + esc(b.label) + ' ' + moneyIn(b.amount, cur))
+            .join(' · ')
+        : '';
+
     return '<article class="settle-card' + (r.state === 'cancelled' ? ' is-off' : '') + '">'
         + '<div class="st-who">'
         +   '<span class="person-mark is-sm">' + esc(initials(r.tr.fromName)) + '</span>'
@@ -3479,6 +3672,10 @@ function settleCard(r, t, cur) {
                 ? '<span class="st-left">' + moneyIn(r.left, cur) + ' left</span>'
                 : '')
         + '</div>'
+
+        /* Its own row under the two above, so the name and the figure keep
+           the line they have always shared. */
+        + (parts ? '<p class="st-parts">' + parts + '</p>' : '')
 
         + '<div class="st-acts">'
         +   '<label class="st-paid"><span>Handed over</span>'
@@ -7469,6 +7666,24 @@ function start() {
         if (then) then();
     });
 
+    /* Which way the settlement is worked out. Stored on the trip, because it
+       is a decision the group made about that trip rather than a preference
+       about the app. */
+    $('settleStyle').addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-val]');
+        const t = trip();
+        if (!btn || !t) return;
+        t.settleStyle = btn.dataset.val === 'payer' ? 'payer' : 'net';
+        save();
+        repaint();
+    });
+
+    $('settleCopy').addEventListener('click', () => {
+        const t = trip();
+        if (!t) return toast('Open a trip first.');
+        copyText(settleSummaryText(t), 'Settlement copied — ready to paste.');
+    });
+
     /* The seg control on the Itinerary. It is the only one on the page, so
        it is wired directly rather than through a shared painter. */
     $('planFilter').addEventListener('click', (event) => {
@@ -7705,7 +7920,7 @@ function start() {
         if (stAll) {
             const t = trip();
             const [from, to] = stAll.split(':');
-            const tr = settlePlan(t).find((x) => x.from === from && x.to === to);
+            const tr = settleTransfers(t).find((x) => x.from === from && x.to === to);
             const row = settleRow(t, from, to);
             /* The same button un-marks it, because the common mistake is
                pressing it on the wrong row. */

@@ -3397,17 +3397,16 @@ function settlePerPayer(t) {
     /* Directed first: "A owes B", with the expenses that made it up. */
     const owed = new Map();
 
+    /* One expense, one payer, is everybody's share owed to whoever paid.
+       A bill with several tills on it is the same question asked line by
+       line — whose money paid for my laksa — which is what owedOn() does
+       for both. */
     mine(db.spend).forEach((x) => {
-        if (!x.by) return;
-        const { bag } = shareOut(x, t);
-        const label = (x.merchant || '').trim() || (x.desc || '').trim() || 'Expense';
-
-        Object.keys(bag).forEach((id) => {
-            if (id === x.by || bag[id] <= 0) return;
-            const key = id + ':' + x.by;
-            const row = owed.get(key) || { from: id, to: x.by, amount: 0, parts: [] };
-            row.amount += bag[id];
-            row.parts.push({ label, amount: bag[id] });
+        owedOn(x, t).forEach((debt) => {
+            const key = debt.from + ':' + debt.to;
+            const row = owed.get(key) || { from: debt.from, to: debt.to, amount: 0, parts: [] };
+            row.amount += debt.amount;
+            row.parts.push({ label: debt.label, amount: debt.amount });
             owed.set(key, row);
         });
     });
@@ -3731,6 +3730,7 @@ const SPLITS = {
     equal:   { label: 'Equal',         hint: 'Split evenly between everybody ticked.' },
     percent: { label: 'Percentage',    hint: 'A share each, as a percentage. It has to come to 100.' },
     exact:   { label: 'Custom amount', hint: 'Type what each person owes. It has to add up to the amount.' },
+    items:   { label: 'By item',       hint: 'Build the bill line by line. The amount above is what it comes to.' },
 };
 
 let editSpend = null;
@@ -3738,6 +3738,9 @@ let spendCatFilter = 'all';
 let spendSplit = 'equal';
 let spendWho = [];
 let spendParts = {};
+/* The by-item bill being typed. Blank until the method asks for one, and
+   kept on the expense after that — see billCompute() below. */
+let spendBill = blankBill();
 let receiptHeld = null;
 let spendAtts = [];
 
@@ -3758,6 +3761,16 @@ function shareOut(x, t) {
     const bag = {};
 
     if (!who.length) return { total, bag };
+
+    /* A bill divides itself: every line, every shared dish and everything
+       the place charged on top come out as one figure per person, and the
+       expense total is handed round in that ratio so the shares add back
+       to it exactly even after the money has changed currency. */
+    if (x.split === 'items') {
+        const parts = allocate(total, billCompute(x, t).paysSen);
+        who.forEach((id, i) => { bag[id] = parts[i] || 0; });
+        return { total, bag };
+    }
 
     if (x.split === 'exact') {
         who.forEach((id) => { bag[id] = toHome(Number((x.parts || {})[id]) || 0, x.cur, t) || 0; });
@@ -3807,12 +3820,753 @@ function balances(t) {
     };
 
     mine(db.spend).forEach((x) => {
-        const { total, bag } = shareOut(x, t);
-        if (x.by) ghost(x.by).paid += total;
+        const { bag } = shareOut(x, t);
+        /* Who put the money down, which is one person on most expenses and
+           a list of tills on a bill several people paid. Either way it adds
+           up to the expense, so the two columns still balance. */
+        const put = paidOut(x, t);
+        Object.keys(put).forEach((id) => { ghost(id).paid += put[id]; });
         Object.keys(bag).forEach((id) => { ghost(id).share += bag[id]; });
     });
 
     return Object.keys(rows).map((id) => Object.assign(rows[id], { net: rows[id].paid - rows[id].share }));
+}
+
+/* ====================================================================
+   THE BILL
+
+   The fourth split method, and the only one that does not divide a
+   figure somebody typed: it builds it. A line per thing somebody had, a
+   line per thing the table shared, whatever the place charged on top,
+   and — because one evening is often three tills — a line per handover.
+
+   Everything here is worked out in the expense's own currency and in
+   sen. shareOut() is what turns the answer into the trip's money, so
+   that a bill and a lump sum reach the balances the same way.
+   ==================================================================== */
+
+const CHARGE_PRESETS = {
+    none: { service: 0, tax: 0 },
+    tax:  { service: 0, tax: 6 },
+    svc:  { service: 10, tax: 0 },
+    both: { service: 10, tax: 6 },
+};
+
+function blankBill() {
+    return {
+        items: [], shared: [],
+        service: 0, tax: 0,
+        discount: 0, discountUnit: 'pct',
+        itemDiscounts: false, offUnit: 'pct',
+        round: false,
+        delivery: false, deliveryFee: 0, platformFee: 0,
+        voucher: 0, voucherUnit: 'cur', feeSplit: 'even',
+        multiPay: false, payments: [],
+    };
+}
+
+/** A stored bill with every field the engine expects, whatever it was saved without. */
+function billOf(x) {
+    const b = Object.assign(blankBill(), (x && x.bill) || {});
+    ['items', 'shared', 'payments'].forEach((k) => { if (!Array.isArray(b[k])) b[k] = []; });
+    return b;
+}
+
+/* Split a figure by weights so the parts always add back to it exactly.
+   The floors are handed out first and the leftover sen go to the biggest
+   remainders, which is the only division that is both fair and closed. */
+function allocate(totalSen, weights) {
+    if (!weights.length || totalSen <= 0) return weights.map(() => 0);
+
+    const sum = weights.reduce((n, w) => n + w, 0);
+    const exact = sum > 0
+        ? weights.map((w) => totalSen * w / sum)
+        : weights.map(() => totalSen / weights.length);
+
+    const parts = exact.map(Math.floor);
+    const order = exact
+        .map((value, index) => ({ index, over: value - Math.floor(value) }))
+        .sort((a, b) => b.over - a.over);
+
+    let left = totalSen - parts.reduce((n, p) => n + p, 0);
+    for (let k = 0; left > 0; k++, left--) parts[order[k % order.length].index]++;
+    return parts;
+}
+
+/** The affix a money field wears: RM at home, the code anywhere else. */
+function curMark(cur) {
+    const code = cur || homeCur();
+    return (CUR[code] && CUR[code].pre.trim()) || code;
+}
+
+/**
+ * The whole bill, in the currency it was paid in.
+ *
+ * The order of the arithmetic is the order the receipt prints it in, and
+ * it is not interchangeable: a discount comes off the food first, the
+ * service charge goes on what is left, and the tax is charged on the
+ * food rather than on the service charge — taxing the sum overcharges
+ * the table by the tax on the service, and every share with it.
+ */
+function billCompute(x, t) {
+    const bill = billOf(x);
+    const who = (x.who || []).slice();
+
+    const gross = (it) => Math.max(0, Number(it.amount) || 0);
+
+    /* A discount on one dish is not the same animal as a discount on the
+       bill. The bill's scales every share by the same factor and moves
+       nobody's position; a dish's belongs to whoever ate that dish, so it
+       comes off the line before any weight is taken from it. */
+    const offOf = (it) => {
+        if (!bill.itemDiscounts) return 0;
+        const typed = Math.max(0, Number(it.off) || 0);
+        const raw = bill.offUnit === 'cur' ? toSen(typed) : Math.round(gross(it) * typed / 100);
+        return Math.min(raw, gross(it));
+    };
+    const netOf = (it) => gross(it) - offOf(it);
+    const itemsOf = (id) => bill.items.filter((it) => it.who === id);
+
+    const all = bill.items.concat(bill.shared);
+    const listedSen  = all.reduce((n, it) => n + gross(it), 0);
+    const itemOffSen = all.reduce((n, it) => n + offOf(it), 0);
+
+    const ownSen   = who.map((id) => itemsOf(id).reduce((n, it) => n + netOf(it), 0));
+    const sharedSen = bill.shared.reduce((n, it) => n + netOf(it), 0);
+
+    /* How one shared dish divides. Evenly unless the dish says otherwise,
+       in which case it divides by portions: five pao at RM11, three eaten
+       by one person and two by another, is 6.60 and 4.40 — not 5.50 each.
+       `out` is the exclusion list rather than the guest list, so somebody
+       ticked onto the expense later joins every dish by default, which is
+       what "shared by everyone" has to keep meaning. */
+    const unitsOf = (it) => who.map((id) => {
+        if ((it.out || []).indexOf(id) > -1) return 0;
+        if (!it.byUnits) return 1;
+        return Math.max(0, Number((it.units || {})[id]) || 0);
+    });
+
+    /* Allocated dish by dish rather than over the pile: once two dishes
+       divide different ways there is no single ratio to divide the pile
+       by, and the odd sen belongs to whoever was short on *that* dish. */
+    const sharedParts = who.map(() => 0);
+    const sharedSplits = bill.shared.map((it) => {
+        const units = unitsOf(it);
+        const parts = allocate(netOf(it), units);
+        parts.forEach((sen, i) => { sharedParts[i] += sen; });
+        return { item: it, units, parts, total: units.reduce((n, u) => n + u, 0) };
+    });
+
+    const weights = ownSen.map((own, i) => own + sharedParts[i]);
+    const foodSen = ownSen.reduce((n, v) => n + v, 0) + sharedSen;
+
+    const serviceRate = Math.max(0, Number(bill.service) || 0);
+    const taxRate     = Math.max(0, Number(bill.tax) || 0);
+
+    const discountTyped = Math.max(0, Number(bill.discount) || 0);
+    const discountSen = Math.min(bill.discountUnit === 'cur'
+        ? toSen(discountTyped)
+        : Math.round(foodSen * discountTyped / 100), foodSen);
+
+    const afterOff  = foodSen - discountSen;
+    const serviceSen = Math.round(afterOff * serviceRate / 100);
+    const taxSen     = Math.round(afterOff * taxRate / 100);
+    const foodPoolSen = afterOff + serviceSen + taxSen;
+
+    /* Two flat fees, neither of them food. Neither gets bigger because
+       somebody ordered more, which is why they divide evenly by default
+       rather than riding on the shares. */
+    const deliverySen = bill.delivery ? Math.max(0, Number(bill.deliveryFee) || 0) : 0;
+    const platformSen = bill.delivery ? Math.max(0, Number(bill.platformFee) || 0) : 0;
+    const feesSen = deliverySen + platformSen;
+
+    /* The voucher comes off once everything is on the order — the food,
+       the charges and the fees — because that is where the app takes it
+       off, and because "free delivery" has to be able to reach the
+       delivery fee. */
+    const orderSen = foodPoolSen + feesSen;
+    const voucherTyped = bill.delivery ? Math.max(0, Number(bill.voucher) || 0) : 0;
+    const voucherSen = Math.min(bill.voucherUnit === 'pct'
+        ? Math.round(orderSen * voucherTyped / 100)
+        : toSen(voucherTyped), orderSen);
+
+    let grandSen = orderSen - voucherSen;
+    if (bill.round) grandSen = Math.round(grandSen / 5) * 5;
+
+    const feeWeights = bill.feeSplit === 'order' ? weights : who.map(() => 1);
+    const feeParts   = allocate(feesSen, feeWeights);
+    const foodParts  = allocate(foodPoolSen, weights);
+    /* With no fees there is nothing to add, so the division is literally
+       the one the weights already say — which is what keeps a saved bill
+       reading the same to the sen. */
+    const spread   = feesSen > 0 ? foodParts.map((sen, i) => sen + feeParts[i]) : weights;
+    const paysSen  = allocate(grandSen, spread);
+    const shareSen = allocate(foodSen, weights);
+
+    /* Every line of the bill in reading order, and each person's piece of
+       it. A person's total is divided across the lines they are on rather
+       than each line being worked out on its own, so the pieces add back
+       to exactly what they pay and no sen goes missing between them. */
+    const lines = [];
+    who.forEach((id, index) => itemsOf(id).forEach((it) => lines.push({
+        item: it, id: it.id, owner: index,
+        label: (String(it.label || '').trim() || 'Item') + ' (' + nameOf(t, id) + ')',
+    })));
+    bill.shared.forEach((it) => lines.push({
+        item: it, id: it.id, owner: -1,
+        label: String(it.label || '').trim() || 'Shared item',
+    }));
+
+    const rawShare = who.map(() => lines.map(() => 0));
+    lines.forEach((line, at) => {
+        if (line.owner >= 0) {
+            rawShare[line.owner][at] = netOf(line.item);
+            return;
+        }
+        const split = sharedSplits.find((one) => one.item === line.item);
+        who.forEach((id, i) => { rawShare[i][at] = split ? split.parts[i] : 0; });
+    });
+
+    const pieces  = who.map((id, i) => allocate(paysSen[i], rawShare[i]));
+    const lineSen = lines.map((line, at) => who.reduce((n, id, i) => n + pieces[i][at], 0));
+
+    /* Which payment claimed which line. A line belongs to at most one —
+       the first that claims it — or the same money would be owed twice. */
+    const payer = x.by || who[0] || '';
+    const lineAt = {};
+    lines.forEach((line, at) => { if (lineAt[line.id] === undefined) lineAt[line.id] = at; });
+
+    const ownerOf = lines.map(() => payer);
+    const claimed = {};
+    const payAmountSen = {};
+    const paidSen = {};
+    let listedPaidSen = 0;
+
+    if (bill.multiPay) {
+        bill.payments.forEach((pay) => {
+            const by = pay.by || payer;
+            let sen = 0;
+
+            (pay.items || []).forEach((id) => {
+                const at = lineAt[id];
+                if (at === undefined || claimed[id]) return;
+                claimed[id] = true;
+                ownerOf[at] = by;
+                sen += lineSen[at];
+            });
+
+            /* Nothing named: it is a lump, and worth whatever was typed. */
+            const amount = (pay.items || []).length ? sen : Math.max(0, Number(pay.amount) || 0);
+            payAmountSen[pay.id] = amount;
+            if (!amount || !by) return;
+            paidSen[by] = (paidSen[by] || 0) + amount;
+            listedPaidSen += amount;
+        });
+    }
+
+    /* Whatever the listed payments leave over goes to the person named
+       under Paid by. That one rule is what makes a bill with no payment
+       list the same object as one with it: nothing listed leaves the
+       whole bill over, and the whole bill lands on the one who paid. */
+    const restSen = grandSen - listedPaidSen;
+    if (payer) paidSen[payer] = (paidSen[payer] || 0) + restSen;
+
+    return {
+        bill, who, lines, pieces, lineSen, ownerOf, payer,
+        listedSen, itemOffSen, ownSen, sharedSen, sharedParts, sharedSplits,
+        foodSen, discountSen, discountTyped, serviceSen, taxSen, serviceRate, taxRate,
+        deliverySen, platformSen, feesSen, feeParts, orderSen, voucherSen, voucherTyped,
+        grandSen, weights, shareSen, paysSen,
+        paidSen, payAmountSen, listedPaidSen, restSen,
+    };
+}
+
+/**
+ * What each person actually put down, in the trip's own money.
+ *
+ * One payer or five, this answers the same question, and it always adds
+ * up to the expense — the balances are only honest while what was handed
+ * over and what was spent are the same figure.
+ */
+function paidOut(x, t) {
+    const total = homeOf({ cost: x.amount, cur: x.cur }, t);
+    const out = {};
+
+    if (x.split !== 'items' || !billOf(x).multiPay) {
+        if (x.by) out[x.by] = total;
+        return out;
+    }
+
+    const c = billCompute(x, t);
+    /* A payment list that comes to more than the bill leaves the primary
+       payer holding a negative, which is a warning on the form rather
+       than a share of anything — it weighs nothing here. */
+    const ids = Object.keys(c.paidSen).filter((id) => c.paidSen[id] > 0);
+    if (!ids.length) {
+        if (x.by) out[x.by] = total;
+        return out;
+    }
+
+    const parts = allocate(total, ids.map((id) => c.paidSen[id]));
+    ids.forEach((id, i) => { out[id] = parts[i]; });
+    return out;
+}
+
+/**
+ * Who owes whom because of one expense, before any netting off.
+ *
+ * With one payer that is the question it always was: everybody who had a
+ * share owes the person who paid. With several it is asked line by line
+ * — whose money paid for my laksa — so the figure somebody is handed can
+ * still be traced to something they ate.
+ */
+function owedOn(x, t) {
+    const out = [];
+    const { bag } = shareOut(x, t);
+    const label = (x.merchant || '').trim() || (x.desc || '').trim() || 'Expense';
+    const bill = billOf(x);
+
+    if (x.split === 'items' && bill.multiPay) {
+        const c = billCompute(x, t);
+        c.who.forEach((id, i) => {
+            /* Each person's own pieces are re-divided out of their share
+               in the trip's money, so the parts of a transfer add back to
+               exactly what the balances say they owe. */
+            const parts = allocate(bag[id] || 0, c.pieces[i]);
+            c.lines.forEach((line, at) => {
+                const owner = c.ownerOf[at];
+                if (!owner || owner === id || parts[at] <= 0) return;
+                out.push({ from: id, to: owner, amount: parts[at], label: label + ' · ' + line.label });
+            });
+        });
+        return out;
+    }
+
+    if (!x.by) return out;
+    Object.keys(bag).forEach((id) => {
+        if (id === x.by || bag[id] <= 0) return;
+        out.push({ from: id, to: x.by, amount: bag[id], label });
+    });
+    return out;
+}
+
+/* --------------------------------------------------------------------
+   The bill on the form
+   --------------------------------------------------------------------
+   The rows are rebuilt only when one is added, removed or changes shape;
+   everything else repaints the figures around them, because rebuilding
+   mid-keystroke takes the caret out of the field being typed into.
+   -------------------------------------------------------------------- */
+
+/** The expense being typed, in the shape the engine reads. */
+function billDraft() {
+    return {
+        who: spendWho.slice(),
+        by: $('spendBy') ? $('spendBy').value : '',
+        cur: $('spendCur') ? ($('spendCur').value || homeCur()) : homeCur(),
+        bill: spendBill,
+    };
+}
+
+const billItem = (id) => spendBill.items.concat(spendBill.shared).find((it) => it.id === id) || null;
+
+/** A person coming off the expense takes their lines with them. */
+function billDropPerson(id) {
+    spendBill.items = spendBill.items.filter((it) => it.who !== id);
+    spendBill.shared.forEach((it) => {
+        if (it.out) it.out = it.out.filter((who) => who !== id);
+        if (it.units) delete it.units[id];
+    });
+    spendBill.payments.forEach((pay) => {
+        if (pay.by === id) pay.by = '';
+        pay.items = (pay.items || []).filter((line) => billItem(line));
+    });
+}
+
+function billMoney(sen, cur) {
+    return moneyIn(sen, cur || (($('spendCur') && $('spendCur').value) || homeCur()));
+}
+
+function paintBillRows() {
+    const t = trip();
+    const cur = ($('spendCur') && $('spendCur').value) || homeCur();
+
+    document.querySelectorAll('.bill-cur').forEach((el) => { el.textContent = curMark(cur); });
+
+    if (!spendWho.length) {
+        html('spendPeopleItems', '<p class="split-empty">Nobody is ticked above, so there is nobody to put a line under. '
+            + 'Tick whoever was there and their lines appear here.</p>');
+    } else {
+        html('spendPeopleItems', spendWho.map((id) => ''
+            + '<div class="split-person">'
+            +   '<div class="split-person-head">'
+            +     '<span class="person-mark is-sm">' + esc(initials(nameOf(t, id))) + '</span>'
+            +     '<span class="split-person-name">' + esc(nameOf(t, id)) + '</span>'
+            +     '<span class="split-person-sum" data-bill-sum="' + esc(id) + '">' + billMoney(0, cur) + '</span>'
+            +   '</div>'
+            +   '<div class="split-items">'
+            +     spendBill.items.filter((it) => it.who === id).map((it) => billItemRow(it, 'What they had')).join('')
+            +   '</div>'
+            +   '<button type="button" class="split-add" data-bill-add="' + esc(id) + '">'
+            +     '<i class="bi bi-plus-lg"></i>Add item</button>'
+            + '</div>').join(''));
+    }
+
+    html('spendShared', spendBill.shared.length
+        ? '<div class="split-items">' + spendBill.shared.map((it) =>
+            billItemRow(it, 'Shared item') + billPortionRow(it)).join('') + '</div>'
+        : '<p class="split-empty">Nothing shared yet &mdash; rice, a plate of fries, the drinks for the table: '
+            + 'anything everybody chipped in for.</p>');
+
+    $('spendPayCard').hidden = !spendBill.multiPay;
+    $('spendPayNote').hidden = !spendBill.multiPay;
+    $('spendMultiPay').checked = !!spendBill.multiPay;
+    $('spendItemOff').checked = !!spendBill.itemDiscounts;
+    $('spendRound').checked = !!spendBill.round;
+    $('spendDelivery').checked = !!spendBill.delivery;
+    $('spendOffUnit').hidden = !spendBill.itemDiscounts;
+    $('spendDeliveryCard').hidden = !spendBill.delivery;
+
+    if (spendBill.multiPay) {
+        const lines = billCompute(billDraft(), t).lines;
+        html('spendPayments', spendBill.payments.length
+            ? spendBill.payments.map((pay) => billPayRow(pay, lines, t)).join('')
+            : '<p class="split-empty">No tills listed yet, so the whole bill is down to whoever is under '
+                + '<b>Paid by</b> above.</p>');
+    }
+
+    ['spendService:service', 'spendTax:tax', 'spendDiscount:discount'].forEach((pair) => {
+        const [id, key] = pair.split(':');
+        const el = $(id);
+        if (el && document.activeElement !== el) el.value = spendBill[key] || '';
+    });
+    ['spendDeliveryFee:deliveryFee', 'spendPlatformFee:platformFee'].forEach((pair) => {
+        const [id, key] = pair.split(':');
+        const el = $(id);
+        if (el && document.activeElement !== el) el.value = spendBill[key] ? fromSen(spendBill[key]) : '';
+    });
+    if ($('spendVoucher') && document.activeElement !== $('spendVoucher')) {
+        $('spendVoucher').value = spendBill.voucher || '';
+    }
+
+    setSeg('spendCharges', chargePresetOf());
+    setSeg('spendDiscountUnit', spendBill.discountUnit);
+    setSeg('spendOffUnit', spendBill.offUnit);
+    setSeg('spendVoucherUnit', spendBill.voucherUnit);
+    setSeg('spendFeeSplit', spendBill.feeSplit);
+
+    set('spendDiscountAffix', spendBill.discountUnit === 'cur' ? curMark(cur) : '%');
+    set('spendVoucherAffix', spendBill.voucherUnit === 'pct' ? '%' : curMark(cur));
+}
+
+/** Which of the four preset buttons the two percentages currently are. */
+function chargePresetOf() {
+    const found = Object.keys(CHARGE_PRESETS).find((key) =>
+        CHARGE_PRESETS[key].service === (Number(spendBill.service) || 0)
+        && CHARGE_PRESETS[key].tax === (Number(spendBill.tax) || 0));
+    return found || '';
+}
+
+function setSeg(id, value) {
+    const seg = $(id);
+    if (!seg) return;
+    seg.dataset.value = value;
+    seg.querySelectorAll('button[data-val]').forEach((b) => {
+        b.classList.toggle('is-on', b.dataset.val === value);
+    });
+}
+
+function billItemRow(it, placeholder) {
+    const off = !!spendBill.itemDiscounts;
+    const cur = ($('spendCur') && $('spendCur').value) || homeCur();
+
+    return '<div class="split-item' + (off ? ' has-off' : '') + '">'
+        + '<input type="text" class="split-item-label" data-bill-label="' + esc(it.id) + '"'
+        +   ' placeholder="' + esc(placeholder) + '" value="' + esc(it.label || '') + '">'
+        + '<div class="money-input money-input-sm"><span class="affix bill-cur">' + esc(curMark(cur)) + '</span>'
+        +   '<input type="number" class="split-item-amount" data-bill-amount="' + esc(it.id) + '"'
+        +   ' min="0" step="0.10" placeholder="0.00" inputmode="decimal"'
+        +   ' value="' + esc(it.amount ? fromSen(it.amount) : '') + '"></div>'
+        + (off
+            ? (spendBill.offUnit === 'cur'
+                ? '<div class="money-input money-input-sm is-off"><span class="affix">&minus;' + esc(curMark(cur)) + '</span>'
+                    + '<input type="number" data-bill-off="' + esc(it.id) + '" min="0" step="0.10"'
+                    + ' placeholder="0.00" inputmode="decimal" aria-label="Discount on this line"'
+                    + ' value="' + esc(it.off === undefined ? '' : it.off) + '"></div>'
+                : '<div class="pct-input"><input type="number" data-bill-off="' + esc(it.id) + '"'
+                    + ' min="0" max="100" step="1" placeholder="0" inputmode="decimal"'
+                    + ' aria-label="Discount on this line" value="' + esc(it.off === undefined ? '' : it.off) + '">'
+                    + '<span>%</span></div>')
+            : '')
+        + '<button type="button" class="split-x" data-bill-drop="' + esc(it.id) + '" aria-label="Remove line">'
+        +   '<i class="bi bi-x-lg"></i></button>'
+        + '</div>';
+}
+
+/**
+ * Who had a shared item, and how much of it.
+ *
+ * Two questions on one strip, because they are the same axis: a table of
+ * four where only two shared the plate is the same arithmetic as a dish
+ * nobody divided equally — somebody's share is zero. Both default to
+ * everyone, equally, so a dish that never touches this strip behaves the
+ * way a shared dish always did.
+ */
+function billPortionRow(it) {
+    const t = trip();
+    const out = it.out || [];
+    const isIn = (id) => out.indexOf(id) < 0;
+
+    const chips = spendWho.map((id) => '<button type="button" class="split-chip' + (isIn(id) ? ' is-in' : '') + '"'
+        + ' data-bill-share="' + esc(it.id + ':' + id) + '" aria-pressed="' + isIn(id) + '">'
+        + '<i class="bi ' + (isIn(id) ? 'bi-check-lg' : 'bi-plus-lg') + '"></i>'
+        + '<span>' + esc(nameOf(t, id)) + '</span></button>').join('');
+
+    const boxes = spendWho.filter(isIn).map((id) => '<label class="split-portion">'
+        + '<span>' + esc(nameOf(t, id)) + '</span>'
+        + '<input type="number" class="split-unit" data-bill-unit="' + esc(it.id + ':' + id) + '"'
+        +   ' min="0" step="1" placeholder="0" inputmode="decimal"'
+        +   ' aria-label="Portions for ' + esc(nameOf(t, id)) + '"'
+        +   ' value="' + esc((it.units || {})[id] === undefined ? '' : it.units[id]) + '"></label>').join('');
+
+    return '<div class="split-portions' + (it.byUnits ? ' is-on' : '') + (out.length ? ' has-out' : '') + '">'
+        + '<div class="split-share">'
+        +   '<span class="split-share-label">Shared by</span>'
+        +   '<div class="split-chips">' + chips + '</div>'
+        +   '<button type="button" class="split-portion-toggle' + (it.byUnits ? ' is-on' : '') + '"'
+        +     ' data-bill-portions="' + esc(it.id) + '">'
+        +     (it.byUnits
+                ? '<i class="bi bi-arrow-left-right"></i>Back to an even split'
+                : '<i class="bi bi-diagram-2"></i>Split by portions')
+        +   '</button>'
+        + '</div>'
+        + (it.byUnits
+            ? '<div class="split-portion-head"><span>Portions <b data-bill-pn="' + esc(it.id) + '">&mdash;</b></span></div>'
+                + '<div class="split-portion-row">' + boxes + '</div>'
+            : '')
+        + '<p class="split-portion-foot" data-bill-pf="' + esc(it.id) + '">&mdash;</p>'
+        + '</div>';
+}
+
+function billPayRow(pay, lines, t) {
+    const cur = ($('spendCur') && $('spendCur').value) || homeCur();
+    const named = (pay.items || []).length;
+
+    const who = spendWho.length ? spendWho : peopleOf(t).map((p) => p.id);
+
+    return '<div class="split-pay">'
+        + '<select data-bill-pay-by="' + esc(pay.id) + '" aria-label="Who paid">'
+        +   who.map((id) => '<option value="' + esc(id) + '"' + (pay.by === id ? ' selected' : '') + '>'
+                + esc(nameOf(t, id)) + '</option>').join('')
+        + '</select>'
+        + '<input type="text" class="split-pay-label" data-bill-pay-label="' + esc(pay.id) + '"'
+        +   ' placeholder="Which till" value="' + esc(pay.label || '') + '">'
+        + '<div class="money-input money-input-sm"><span class="affix bill-cur">' + esc(curMark(cur)) + '</span>'
+        +   '<input type="number" class="split-pay-amount' + (named ? ' is-read' : '') + '"'
+        +   ' data-bill-pay-amount="' + esc(pay.id) + '" min="0" step="0.10" placeholder="0.00"'
+        +   ' inputmode="decimal"' + (named ? ' readonly' : '')
+        +   ' value="' + esc(pay.amount ? fromSen(pay.amount) : '') + '"></div>'
+        + '<button type="button" class="split-x" data-bill-pay-drop="' + esc(pay.id) + '" aria-label="Remove payment">'
+        +   '<i class="bi bi-x-lg"></i></button>'
+        + '</div>'
+        + billPayLines(pay, lines);
+}
+
+function billPayLines(pay, lines) {
+    const mineLines = pay.items || [];
+
+    if (!lines.length) {
+        return '<div class="split-pay-lines"><span class="split-share-label">Paid for</span>'
+            + '<p class="split-empty">Nothing on the bill yet.</p></div>';
+    }
+
+    return '<div class="split-pay-lines">'
+        + '<span class="split-share-label">Paid for</span>'
+        + '<div class="split-chips">'
+        + lines.map((line) => {
+            const on = mineLines.indexOf(line.id) > -1;
+            return '<button type="button" class="split-chip' + (on ? ' is-in' : '') + '"'
+                + ' data-bill-pay-line="' + esc(pay.id + ':' + line.id) + '" aria-pressed="' + on + '">'
+                + '<i class="bi ' + (on ? 'bi-check-lg' : 'bi-plus-lg') + '"></i>'
+                + '<span>' + esc(line.label) + '</span></button>';
+        }).join('')
+        + '</div></div>';
+}
+
+/** Everything on the bill that is a figure rather than a field. */
+function paintBillSums() {
+    const t = trip();
+    const cur = ($('spendCur') && $('spendCur').value) || homeCur();
+    const c = billCompute(billDraft(), t);
+    const cash = (sen) => moneyIn(sen, cur);
+
+    /* The amount is no longer typed: it is what the lines come to. */
+    const amount = $('spendAmount');
+    if (amount) amount.value = c.grandSen ? fromSen(c.grandSen) : '';
+
+    set('spendTallyFood', cash(c.itemOffSen > 0 ? c.listedSen : c.foodSen));
+    set('spendTallyItemOff', '− ' + cash(c.itemOffSen));
+    set('spendTallyDiscount', '− ' + cash(c.discountSen));
+    set('spendTallyDiscountLabel', c.bill.discountUnit === 'pct' && c.discountTyped
+        ? 'Discount ' + c.discountTyped + '%' : 'Discount');
+    set('spendTallyService', cash(c.serviceSen));
+    set('spendTallyServiceLabel', 'Service charge ' + c.serviceRate + '%');
+    set('spendTallyTax', cash(c.taxSen));
+    set('spendTallyTaxLabel', 'Tax ' + c.taxRate + '%');
+    set('spendTallyDelivery', cash(c.deliverySen));
+    set('spendTallyPlatform', cash(c.platformSen));
+    set('spendTallyVoucher', '− ' + cash(c.voucherSen));
+    set('spendTallyVoucherLabel', c.bill.voucherUnit === 'pct' && c.voucherTyped
+        ? 'Voucher ' + c.voucherTyped + '%' : 'Voucher');
+    set('spendTallyTotal', cash(c.grandSen));
+
+    const showRow = (id, show) => { const row = $(id); if (row) row.hidden = !show; };
+    showRow('spendRowItemOff', c.itemOffSen > 0);
+    showRow('spendRowDiscount', c.discountSen > 0);
+    showRow('spendRowService', c.serviceRate > 0);
+    showRow('spendRowTax', c.taxRate > 0);
+    showRow('spendRowDelivery', c.deliverySen > 0);
+    showRow('spendRowPlatform', c.platformSen > 0);
+    showRow('spendRowVoucher', c.voucherSen > 0);
+
+    const bits = [
+        c.serviceRate ? 'service ' + c.serviceRate + '%' : '',
+        c.taxRate ? 'tax ' + c.taxRate + '%' : '',
+        c.discountSen ? '− ' + (c.bill.discountUnit === 'pct' ? c.discountTyped + '%' : cash(c.discountSen)) + ' off the bill' : '',
+        c.itemOffSen ? '− ' + cash(c.itemOffSen) + ' off lines' : '',
+        c.bill.itemDiscounts && !c.itemOffSen ? 'per-line discounts on' : '',
+        c.deliverySen ? 'delivery ' + cash(c.deliverySen) : '',
+        c.platformSen ? 'platform ' + cash(c.platformSen) : '',
+        c.voucherSen ? '− ' + cash(c.voucherSen) + ' voucher' : '',
+        c.bill.delivery && c.feesSen > 0 && c.bill.feeSplit === 'order' ? 'fees by what each ordered' : '',
+        c.bill.round ? 'rounded' : '',
+    ].filter(Boolean);
+    set('spendChargeSummary', bits.length ? bits.join(' · ') : 'None');
+
+    c.who.forEach((id, i) => {
+        const box = document.querySelector('[data-bill-sum="' + id + '"]');
+        if (box) box.textContent = cash(c.paysSen[i]);
+    });
+
+    set('spendSharedTotal', cash(c.sharedSen));
+    set('spendItemsNote', c.foodSen > 0
+        ? 'Ordered ' + cash(c.foodSen - c.sharedSen)
+        : 'Nothing on the bill yet');
+
+    /* A payment that named lines is worth what those lines come to, and
+       the box says so rather than asking. */
+    spendBill.payments.forEach((pay) => {
+        const box = document.querySelector('[data-bill-pay-amount="' + pay.id + '"]');
+        if (box && box.readOnly) box.value = fromSen(c.payAmountSen[pay.id] || 0);
+    });
+
+    set('spendPayNote', c.grandSen > 0
+        ? cash(c.listedPaidSen) + ' of ' + cash(c.grandSen) + ' listed'
+        : 'Nothing on the bill yet');
+
+    const restName = nameOf(t, c.payer);
+    set('spendPayHint', c.restSen > 0
+        ? cash(c.restSen) + ' of the bill is not on this list, so it is down to ' + restName
+            + '. Add a line for each of the other tills and it comes to nothing.'
+        : c.restSen < 0
+            ? 'These payments come to ' + cash(-c.restSen) + ' more than the bill does. '
+                + 'Either a figure is too high, or something is missing from what everybody had.'
+            : 'Every sen of the bill is accounted for.');
+
+    paintBillPortions(c);
+    paintBillPays(c, cash);
+}
+
+function paintBillPortions(c) {
+    c.sharedSplits.forEach((split) => {
+        const it = split.item;
+        const out = it.out || [];
+        const plain = !it.byUnits && !out.length;
+
+        const count = document.querySelector('[data-bill-pn="' + it.id + '"]');
+        if (count) count.textContent = split.total ? String(split.total) : '—';
+
+        const foot = document.querySelector('[data-bill-pf="' + it.id + '"]');
+        if (!foot) return;
+
+        /* A dish shared by everybody, equally, needs no explanation —
+           that is what a shared dish is. Anything else does. */
+        foot.hidden = plain;
+        if (plain) return;
+
+        if (it.byUnits && !split.total) {
+            foot.textContent = out.length
+                ? 'No portions typed yet, so this is splitting evenly between the '
+                    + (c.who.length - out.length) + ' still on it.'
+                : 'Nobody has a portion yet, so this line is still splitting evenly.';
+            return;
+        }
+
+        const named = c.who
+            .map((id, i) => ({ id, sen: split.parts[i] || 0 }))
+            .filter((row) => row.sen > 0);
+
+        foot.textContent = named.length
+            ? named.map((row) => nameOf(trip(), row.id) + ' ' + billMoney(row.sen)).join(' · ')
+            : 'Nobody is on this line yet.';
+    });
+}
+
+function paintBillPays(c, cash) {
+    const t = trip();
+
+    set('spendPaysNote', c.grandSen > 0 ? 'Charges and discounts included' : '');
+
+    if (!c.who.length || c.grandSen <= 0) {
+        return html('spendPaysBody', '<tr><td colspan="4" class="is-muted">'
+            + 'Put in what everybody had and the split works itself out.</td></tr>');
+    }
+
+    html('spendPaysBody', c.who.map((id, i) => {
+        const share  = c.shareSen[i];
+        const pays   = c.paysSen[i];
+        const charge = pays - share;
+        const lines  = c.bill.items.filter((it) => it.who === id && (Number(it.amount) || 0) > 0).length;
+
+        /* "A share of the table" is only true of a dish that divided
+           evenly. Once one went by portions, saying it of somebody who
+           ate three of five pao understates what they had. */
+        const portions = c.sharedSplits
+            .filter((split) => split.item.byUnits && split.total)
+            .reduce((n, split) => n + (split.units[i] || 0), 0);
+
+        const sharedNote = portions > 0
+            ? ' + ' + portions + (portions === 1 ? ' portion shared' : ' portions shared')
+            : c.sharedParts[i] > 0 ? ' + a share of the table' : '';
+
+        /* A flat fee divided evenly has nothing to do with what they
+           ordered, so it is named rather than left looking like one. */
+        const fee = c.feeParts[i] || 0;
+        const detail = (lines ? lines + (lines === 1 ? ' line' : ' lines') : 'Nothing ordered')
+            + sharedNote + (fee > 0 ? ' + ' + cash(fee) + ' of the fees' : '');
+
+        const put = c.paidSen[id] || 0;
+
+        return '<tr>'
+            + '<td><strong>' + esc(nameOf(t, id)) + '</strong>'
+            +   (put > 0 ? '<span class="tag is-paid">' + (Object.keys(c.paidSen).filter((k) => c.paidSen[k] > 0).length > 1
+                    ? 'paid ' + esc(cash(put)) : 'paid') + '</span>' : '')
+            +   '<small>' + esc(detail) + '</small></td>'
+            + '<td>' + cash(share) + '</td>'
+            + '<td class="' + (charge < 0 ? 'is-minus' : 'is-muted') + '">'
+            +   (charge < 0 ? '− ' : charge > 0 ? '+ ' : '') + cash(Math.abs(charge)) + '</td>'
+            + '<td class="is-strong">' + cash(pays) + '</td>'
+            + '</tr>';
+    }).join('')
+    + '<tr class="total-row"><td>Bill total</td><td>' + cash(c.foodSen) + '</td>'
+    + '<td>' + ((c.grandSen - c.foodSen) < 0 ? '− ' : (c.grandSen - c.foodSen) > 0 ? '+ ' : '')
+    +   cash(Math.abs(c.grandSen - c.foodSen)) + '</td>'
+    + '<td>' + cash(c.grandSen) + '</td></tr>');
+}
+
+function paintBill() {
+    paintBillRows();
+    paintBillSums();
 }
 
 /* ====================================================================
@@ -4032,6 +4786,10 @@ function openSpendForm(id) {
             spendParts[k] = exact ? fromSen(x.parts[k]) : x.parts[k];
         });
     }
+    /* The bill is edited as a copy, so abandoning the form leaves the one
+       on the record exactly as it was. */
+    spendBill = billOf(x && x.bill ? { bill: JSON.parse(JSON.stringify(x.bill)) } : null);
+
     receiptHeld = x ? (x.receipt || null) : null;
     spendAtts = x && x.atts ? x.atts.slice() : [];
 
@@ -4057,6 +4815,12 @@ function openSpendForm(id) {
     paintReceipt();
     paintSpendAtts();
 
+    /* A bill that has charges on it never hides them behind a shut door;
+       one that has none opens on the lines, which is what it is for. */
+    $('spendChargeFold').open = spendSplit === 'items'
+        && !!(spendBill.service || spendBill.tax || spendBill.discount
+            || spendBill.itemDiscounts || spendBill.round || spendBill.delivery);
+
     $('spendFormCard').hidden = false;
     $('spendFormCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     $('spendMerchant').focus();
@@ -4076,9 +4840,15 @@ function closeSpendForm() {
 function blankSpendForm() {
     spendWho = [];
     spendParts = {};
+    spendBill = blankBill();
     receiptHeld = null;
     spendAtts = [];
     ['spendMerchant', 'spendDesc', 'spendAmount', 'spendNoteText', 'spendTime'].forEach((id) => { $(id).value = ''; });
+    /* The chips and the bill are drawn from those three, so they are
+       redrawn from them — an emptied form that still shows five people
+       ticked and a bill under them is not empty. */
+    paintWhoPick();
+    paintSplit();
 }
 
 /* A reference somebody can say out loud, counted per trip so two trips do
@@ -4094,8 +4864,18 @@ function saveSpend() {
     if (!t) return;
 
     const merchant = $('spendMerchant').value.trim();
-    const amount = toSen($('spendAmount').value);
+    /* A by-item bill has no amount typed into it: the lines are the
+       amount, and the field above only reports what they come to. */
+    const amount = spendSplit === 'items'
+        ? billCompute(billDraft(), t).grandSen
+        : toSen($('spendAmount').value);
+
     if (!merchant) return $('spendMerchant').focus();
+    if (!amount && spendSplit === 'items') {
+        set('spendSplitHint', 'Nothing on the bill yet — put in what somebody had and the total fills itself in.');
+        $('spendSplitHint').classList.add('is-wrong');
+        return $('spendBill').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     if (!amount) return $('spendAmount').focus();
 
     /* A split that does not add up is a split that is wrong rather than a
@@ -4111,7 +4891,7 @@ function saveSpend() {
     }
 
     const parts = {};
-    if (spendSplit !== 'equal') {
+    if (spendSplit === 'percent' || spendSplit === 'exact') {
         spendWho.forEach((id) => {
             parts[id] = spendSplit === 'exact' ? toSen(spendParts[id] || 0) : (Number(spendParts[id]) || 0);
         });
@@ -4131,6 +4911,9 @@ function saveSpend() {
         who: spendWho.slice(),
         split: spendSplit,
         parts,
+        /* Kept whichever method is chosen, so switching to Equal to check
+           a figure and switching back does not throw away the bill. */
+        bill: JSON.parse(JSON.stringify(spendBill)),
         note: $('spendNoteText').value.trim(),
         receipt: receiptHeld,
         atts: spendAtts.slice(),
@@ -4239,10 +5022,17 @@ function paintSplit() {
     const t = trip();
     const rows = $('spendParts');
     const per = spendSplit === 'exact';
-    rows.hidden = spendSplit === 'equal' || !spendWho.length;
+    const built = spendSplit === 'items';
+    rows.hidden = built || spendSplit === 'equal' || !spendWho.length;
 
     $('spendSplitHint').classList.remove('is-wrong');
     set('spendSplitHint', SPLITS[spendSplit] ? SPLITS[spendSplit].hint : SPLITS.equal.hint);
+
+    /* The bill writes the amount rather than reading it, so the field
+       above stops being typed into for as long as this method is on. */
+    $('spendBill').hidden = !built;
+    $('spendAmount').readOnly = built;
+    if (built) return paintBill();
 
     if (rows.hidden) return;
 
@@ -7539,8 +8329,68 @@ function start() {
     /* Changing the amount can turn a valid exact split into a wrong one,
        so the hint is recomputed rather than left saying it was fine. */
     $('spendAmount').addEventListener('input', () => {
-        if (spendSplit !== 'equal') paintSplit();
+        if (spendSplit !== 'equal' && spendSplit !== 'items') paintSplit();
     });
+
+    /* ---- the bill ----------------------------------------------------
+       Adding, removing or reshaping a row rebuilds the rows; typing into
+       one only repaints the figures around it, because a rebuild would
+       take the caret out of the field being typed into. */
+    $('spendAddShared').addEventListener('click', () => {
+        spendBill.shared.push({ id: newId('bl'), label: '', amount: 0, off: '', out: [], byUnits: false, units: {} });
+        paintBill();
+    });
+
+    $('spendAddPayment').addEventListener('click', () => {
+        spendBill.payments.push({ id: newId('pay'), by: $('spendBy').value || spendWho[0] || '', label: '', amount: 0, items: [] });
+        paintBill();
+    });
+
+    [['spendItemOff', 'itemDiscounts'], ['spendRound', 'round'],
+     ['spendDelivery', 'delivery'], ['spendMultiPay', 'multiPay']].forEach((pair) => {
+        $(pair[0]).addEventListener('change', () => {
+            spendBill[pair[1]] = $(pair[0]).checked;
+            paintBill();
+        });
+    });
+
+    [['spendCharges', ''], ['spendDiscountUnit', 'discountUnit'], ['spendOffUnit', 'offUnit'],
+     ['spendVoucherUnit', 'voucherUnit'], ['spendFeeSplit', 'feeSplit']].forEach((pair) => {
+        $(pair[0]).addEventListener('click', (event) => {
+            const btn = event.target.closest('button[data-val]');
+            if (!btn) return;
+            if (pair[1]) {
+                spendBill[pair[1]] = btn.dataset.val;
+            } else {
+                const preset = CHARGE_PRESETS[btn.dataset.val];
+                if (preset) { spendBill.service = preset.service; spendBill.tax = preset.tax; }
+            }
+            paintBill();
+        });
+    });
+
+    /* Percentages are kept as typed — they are rates, not money. */
+    [['spendService', 'service'], ['spendTax', 'tax'],
+     ['spendDiscount', 'discount'], ['spendVoucher', 'voucher']].forEach((pair) => {
+        $(pair[0]).addEventListener('input', () => {
+            spendBill[pair[1]] = Number($(pair[0]).value) || 0;
+            if (pair[1] === 'service' || pair[1] === 'tax') setSeg('spendCharges', chargePresetOf());
+            paintBillSums();
+        });
+    });
+
+    [['spendDeliveryFee', 'deliveryFee'], ['spendPlatformFee', 'platformFee']].forEach((pair) => {
+        $(pair[0]).addEventListener('input', () => {
+            spendBill[pair[1]] = toSen($(pair[0]).value);
+            paintBillSums();
+        });
+    });
+
+    /* Every figure on the bill wears the expense's own currency, and the
+       person carrying whatever the tills do not account for is named in
+       the hint under them — so both redraw when either changes. */
+    $('spendCur').addEventListener('change', () => { if (spendSplit === 'items') paintBill(); });
+    $('spendBy').addEventListener('change', () => { if (spendSplit === 'items') paintBillSums(); });
 
     $('spendReceiptAdd').addEventListener('click', () => $('spendReceiptFile').click());
     
@@ -7715,6 +8565,56 @@ function start() {
             return settleWrite(trip(), from, to, { paid: toSen(stPaid.value), cancelled: false });
         }
 
+        /* The bill's own fields. Each writes into the draft and repaints
+           the figures; none of them rebuilds the row it sits in. */
+        const bLabel = event.target.closest('[data-bill-label]');
+        if (bLabel) {
+            const it = billItem(bLabel.dataset.billLabel);
+            if (it) it.label = bLabel.value;
+            return paintBillSums();
+        }
+
+        const bAmount = event.target.closest('[data-bill-amount]');
+        if (bAmount) {
+            const it = billItem(bAmount.dataset.billAmount);
+            if (it) it.amount = toSen(bAmount.value);
+            return paintBillSums();
+        }
+
+        const bOff = event.target.closest('[data-bill-off]');
+        if (bOff) {
+            const it = billItem(bOff.dataset.billOff);
+            /* Kept as typed: the same field is a percentage or an amount
+               depending on the unit beside it. */
+            if (it) it.off = bOff.value;
+            return paintBillSums();
+        }
+
+        const bUnit = event.target.closest('[data-bill-unit]');
+        if (bUnit) {
+            const cut = bUnit.dataset.billUnit.split(':');
+            const it = billItem(cut[0]);
+            if (it) {
+                it.units = it.units || {};
+                it.units[cut[1]] = bUnit.value;
+            }
+            return paintBillSums();
+        }
+
+        const bPayLabel = event.target.closest('[data-bill-pay-label]');
+        if (bPayLabel) {
+            const pay = spendBill.payments.find((p) => p.id === bPayLabel.dataset.billPayLabel);
+            if (pay) pay.label = bPayLabel.value;
+            return;
+        }
+
+        const bPayAmount = event.target.closest('[data-bill-pay-amount]');
+        if (bPayAmount) {
+            const pay = spendBill.payments.find((p) => p.id === bPayAmount.dataset.billPayAmount);
+            if (pay) pay.amount = toSen(bPayAmount.value);
+            return paintBillSums();
+        }
+
         const part = event.target.closest('[data-part]');
         if (part) {
             spendParts[part.dataset.part] = part.value;
@@ -7766,6 +8666,13 @@ function start() {
     });
 
     document.addEventListener('change', (event) => {
+        const payBy = event.target.closest('[data-bill-pay-by]');
+        if (payBy) {
+            const pay = spendBill.payments.find((p) => p.id === payBy.dataset.billPayBy);
+            if (pay) pay.by = payBy.value;
+            return paintBillSums();
+        }
+
         const box = event.target.closest('[data-pack]');
         if (!box) return;
         const row = db.packs.find((p) => p.id === box.dataset.pack);
@@ -7942,10 +8849,77 @@ function start() {
 
         const who = hit('data-who');
         if (who) {
-            if (spendWho.includes(who)) spendWho = spendWho.filter((id) => id !== who);
-            else spendWho.push(who);
+            if (spendWho.includes(who)) {
+                spendWho = spendWho.filter((id) => id !== who);
+                /* Somebody taken off the expense takes their lines with
+                   them. Leaving them behind would put money on the bill
+                   that nobody on it is carrying. */
+                billDropPerson(who);
+            } else {
+                spendWho.push(who);
+            }
             paintWhoPick();
             return paintSplit();
+        }
+
+        /* ---- the bill ---- */
+        const bAdd = hit('data-bill-add');
+        if (bAdd) {
+            spendBill.items.push({ id: newId('bl'), who: bAdd, label: '', amount: 0, off: '' });
+            paintBill();
+            const rows = document.querySelectorAll('[data-bill-label]');
+            const last = [...rows].filter((el) => spendBill.items.some((it) =>
+                it.who === bAdd && it.id === el.dataset.billLabel)).pop();
+            if (last) last.focus();
+            return;
+        }
+
+        const bDrop = hit('data-bill-drop');
+        if (bDrop) {
+            spendBill.items = spendBill.items.filter((it) => it.id !== bDrop);
+            spendBill.shared = spendBill.shared.filter((it) => it.id !== bDrop);
+            /* A line that is gone cannot still be on somebody's till. */
+            spendBill.payments.forEach((pay) => {
+                pay.items = (pay.items || []).filter((id) => id !== bDrop);
+            });
+            return paintBill();
+        }
+
+        const bShare = hit('data-bill-share');
+        if (bShare) {
+            const cut = bShare.split(':');
+            const it = billItem(cut[0]);
+            if (!it) return;
+            it.out = it.out || [];
+            it.out = it.out.indexOf(cut[1]) > -1
+                ? it.out.filter((id) => id !== cut[1])
+                : it.out.concat(cut[1]);
+            return paintBill();
+        }
+
+        const bPort = hit('data-bill-portions');
+        if (bPort) {
+            const it = billItem(bPort);
+            if (it) it.byUnits = !it.byUnits;
+            return paintBill();
+        }
+
+        const bLine = hit('data-bill-pay-line');
+        if (bLine) {
+            const cut = bLine.split(':');
+            const pay = spendBill.payments.find((p) => p.id === cut[0]);
+            if (!pay) return;
+            pay.items = pay.items || [];
+            pay.items = pay.items.indexOf(cut[1]) > -1
+                ? pay.items.filter((id) => id !== cut[1])
+                : pay.items.concat(cut[1]);
+            return paintBill();
+        }
+
+        const bPayDrop = hit('data-bill-pay-drop');
+        if (bPayDrop) {
+            spendBill.payments = spendBill.payments.filter((p) => p.id !== bPayDrop);
+            return paintBill();
         }
 
         const scFil = hit('data-sc-filter');

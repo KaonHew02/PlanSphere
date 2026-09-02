@@ -921,6 +921,7 @@
                                 <button type="button" data-val="equal" class="is-on">Equal</button>
                                 <button type="button" data-val="percent">Percentage</button>
                                 <button type="button" data-val="exact">Custom amount</button>
+                                <button type="button" data-val="items">By item</button>
                             </div>
                             <div class="split-rows" id="spendParts" hidden></div>
                             <p class="hint" id="spendSplitHint"><i class="bi bi-info-circle"></i>Split evenly between everybody ticked.</p>
@@ -958,6 +959,244 @@
                                 </div>
                             </div>
                             <input type="file" id="spendAttFile" multiple hidden>
+                        </div>
+                    </div>
+
+                    <!-- ------------------------------------------------------
+                         THE BILL
+
+                         Only on screen for the by-item method. The other three
+                         divide a figure somebody typed; this one builds it —
+                         a line per thing somebody had, a line per thing the
+                         table shared, and whatever the place charged on top.
+                         The Amount field above stops being typed into and
+                         starts reporting what the lines come to.
+                         ------------------------------------------------------ -->
+                    <div class="bill-build" id="spendBill" hidden>
+
+                        <details class="fold" id="spendChargeFold">
+                            <summary>
+                                <span><i class="bi bi-receipt"></i>Service charge, tax &amp; discount</span>
+                                <b id="spendChargeSummary">None</b>
+                            </summary>
+
+                            <div class="field-grid">
+                                <div class="field is-wide">
+                                    <label>What the place charges</label>
+                                    <div class="seg is-wrap" id="spendCharges" data-value="none">
+                                        <button type="button" data-val="none" class="is-on">None</button>
+                                        <button type="button" data-val="tax">6%</button>
+                                        <button type="button" data-val="svc">10%</button>
+                                        <button type="button" data-val="both">10% + 6%</button>
+                                    </div>
+                                    <p class="hint"><i class="bi bi-info-circle"></i>Service charge goes on first, then the tax is charged on the food &mdash; the same order the receipt prints it in.</p>
+                                </div>
+
+                                <div class="field">
+                                    <label for="spendService">Service charge</label>
+                                    <div class="pct-input">
+                                        <input type="number" id="spendService" min="0" max="100" step="1" placeholder="0" inputmode="decimal"><span>%</span>
+                                    </div>
+                                </div>
+
+                                <div class="field">
+                                    <label for="spendTax">Tax</label>
+                                    <div class="pct-input">
+                                        <input type="number" id="spendTax" min="0" max="100" step="1" placeholder="0" inputmode="decimal"><span>%</span>
+                                    </div>
+                                </div>
+
+                                <div class="field is-wide">
+                                    <label for="spendDiscount">Discount <span class="per">off the whole bill</span></label>
+                                    <div class="field-pair">
+                                        <div class="pct-input" id="spendDiscountBox">
+                                            <input type="number" id="spendDiscount" min="0" step="1" placeholder="0" inputmode="decimal"><span id="spendDiscountAffix">%</span>
+                                        </div>
+                                        <!-- Most discounts are a percentage; a voucher is the
+                                             exception, so money is the second button rather
+                                             than the only one. -->
+                                        <div class="seg is-compact" id="spendDiscountUnit" data-value="pct">
+                                            <button type="button" data-val="pct" class="is-on">%</button>
+                                            <button type="button" data-val="cur" class="bill-cur">RM</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- A promo on one dish is a different thing from a promo on
+                                 the bill: it belongs to whoever ate that dish, so it comes
+                                 off before anyone's share is worked out. -->
+                            <div class="check-row">
+                                <label class="check-line">
+                                    <input type="checkbox" id="spendItemOff">
+                                    <span>Some lines have their own discount</span>
+                                </label>
+                                <div class="seg is-compact" id="spendOffUnit" data-value="pct" hidden>
+                                    <button type="button" data-val="pct" class="is-on">%</button>
+                                    <button type="button" data-val="cur" class="bill-cur">RM</button>
+                                </div>
+                            </div>
+
+                            <label class="check-line">
+                                <input type="checkbox" id="spendRound">
+                                <span>Round the total to the nearest 5 (paying cash)</span>
+                            </label>
+
+                            <!-- Ordered in. A delivery receipt has two lines that are not
+                                 food — the ride and the app — and a voucher that comes off
+                                 once both are on it. All three are flat amounts, which is
+                                 why they cannot be said with the percentages above. -->
+                            <label class="check-line">
+                                <input type="checkbox" id="spendDelivery">
+                                <span>This was a delivery (foodpanda, Grab, ShopeeFood&hellip;)</span>
+                            </label>
+
+                            <div class="split-delivery" id="spendDeliveryCard" hidden>
+                                <div class="field-grid">
+                                    <div class="field">
+                                        <label for="spendDeliveryFee">Delivery fee</label>
+                                        <div class="money-input money-input-sm">
+                                            <span class="affix bill-cur">RM</span>
+                                            <input type="number" id="spendDeliveryFee" min="0" step="0.10" placeholder="0.00" inputmode="decimal">
+                                        </div>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="spendPlatformFee">Platform fee</label>
+                                        <div class="money-input money-input-sm">
+                                            <span class="affix bill-cur">RM</span>
+                                            <input type="number" id="spendPlatformFee" min="0" step="0.10" placeholder="0.00" inputmode="decimal">
+                                        </div>
+                                        <p class="hint"><i class="bi bi-info-circle"></i>Whatever the app charges on top of the ride &mdash; service fee, platform fee, small-order fee. Add them together.</p>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="spendVoucher">Voucher <span class="per">off the order</span></label>
+                                        <div class="field-pair">
+                                            <div class="money-input money-input-sm" id="spendVoucherBox">
+                                                <span class="affix" id="spendVoucherAffix">RM</span>
+                                                <input type="number" id="spendVoucher" min="0" step="0.10" placeholder="0.00" inputmode="decimal">
+                                            </div>
+                                            <div class="seg is-compact" id="spendVoucherUnit" data-value="cur">
+                                                <button type="button" data-val="cur" class="is-on bill-cur">RM</button>
+                                                <button type="button" data-val="pct">%</button>
+                                            </div>
+                                        </div>
+                                        <p class="hint"><i class="bi bi-info-circle"></i>Taken off after the fees, the way the app takes it off &mdash; so a free-delivery promo can reach the delivery fee.</p>
+                                    </div>
+
+                                    <div class="field is-wide">
+                                        <label>How the fees divide</label>
+                                        <div class="seg is-wrap" id="spendFeeSplit" data-value="even">
+                                            <button type="button" data-val="even" class="is-on">Evenly</button>
+                                            <button type="button" data-val="order">By what each ordered</button>
+                                        </div>
+                                        <p class="hint"><i class="bi bi-info-circle"></i>A flat fee is not bigger because somebody ordered more &mdash; the person who added a drink did not use less of the delivery.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <div class="bill-block">
+                            <div class="bill-head">
+                                <h3>Who had what</h3>
+                                <span class="card-note" id="spendItemsNote"></span>
+                            </div>
+                            <div id="spendPeopleItems"></div>
+                            <p class="hint"><i class="bi bi-info-circle"></i>One line per thing somebody had, under the person who had it &mdash; a name on the line is optional, so a single figure for somebody who does not want it itemised works too. Anything the table shared goes in the block below.</p>
+                        </div>
+
+                        <div class="bill-block">
+                            <div class="bill-head">
+                                <h3>Shared by everyone</h3>
+                                <span class="card-note">Shared <b id="spendSharedTotal">&mdash;</b></span>
+                                <button type="button" class="ghost-btn" id="spendAddShared">
+                                    <i class="bi bi-plus-lg"></i>Add item
+                                </button>
+                            </div>
+                            <div id="spendShared"></div>
+                            <p class="hint"><i class="bi bi-info-circle"></i>Everyone, equally, by default. Tap a name off <b>Shared by</b> when somebody did not have that dish, and press <b>Split by portions</b> when they did not have the same amount of it: three of the five pao, two of the three beers. The price follows.</p>
+                        </div>
+
+                        <!-- One evening is often three tills. A line per handover, and
+                             whatever the lines do not account for stays with the person
+                             named under Paid by — which is why a bill with no lines at
+                             all is still one person paying the lot. -->
+                        <div class="bill-block">
+                            <div class="check-row">
+                                <label class="check-line">
+                                    <input type="checkbox" id="spendMultiPay">
+                                    <span>More than one person paid</span>
+                                </label>
+                                <span class="card-note" id="spendPayNote" hidden>&mdash;</span>
+                            </div>
+
+                            <div class="split-pay-card" id="spendPayCard" hidden>
+                                <div id="spendPayments"></div>
+                                <button type="button" class="split-add" id="spendAddPayment">
+                                    <i class="bi bi-plus-lg"></i>Add a payment
+                                </button>
+                                <p class="hint" id="spendPayHint"><i class="bi bi-info-circle"></i></p>
+                            </div>
+                        </div>
+
+                        <div class="tally">
+                            <div class="tally-cell">
+                                <span>Ordered</span>
+                                <b id="spendTallyFood">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowItemOff" hidden>
+                                <span>Line discounts</span>
+                                <b id="spendTallyItemOff" class="is-minus">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowDiscount" hidden>
+                                <span id="spendTallyDiscountLabel">Discount</span>
+                                <b id="spendTallyDiscount" class="is-minus">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowService" hidden>
+                                <span id="spendTallyServiceLabel">Service charge</span>
+                                <b id="spendTallyService">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowTax" hidden>
+                                <span id="spendTallyTaxLabel">Tax</span>
+                                <b id="spendTallyTax">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowDelivery" hidden>
+                                <span>Delivery fee</span>
+                                <b id="spendTallyDelivery">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowPlatform" hidden>
+                                <span>Platform fee</span>
+                                <b id="spendTallyPlatform">&mdash;</b>
+                            </div>
+                            <div class="tally-cell" id="spendRowVoucher" hidden>
+                                <span id="spendTallyVoucherLabel">Voucher</span>
+                                <b id="spendTallyVoucher" class="is-minus">&mdash;</b>
+                            </div>
+                            <div class="tally-cell is-total">
+                                <span>Bill total</span>
+                                <b id="spendTallyTotal">&mdash;</b>
+                            </div>
+                        </div>
+
+                        <div class="bill-block">
+                            <div class="bill-head">
+                                <h3>Everyone pays</h3>
+                                <span class="card-note" id="spendPaysNote"></span>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Person</th>
+                                            <th>Had</th>
+                                            <th>Share of charges</th>
+                                            <th>Pays</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="spendPaysBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 

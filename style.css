@@ -4433,3 +4433,362 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 .cal-pick:hover > i { color: var(--azure-ink); }
 .cal-pick select:focus { color: var(--ink); }
 
+
+/* ==========================================================================
+   THE BILL — an expense split the way a receipt is written
+   ==========================================================================
+   The other three methods divide one figure. This one builds it: a line per
+   thing somebody had, a line per thing the table shared, and whatever the
+   place charged on top. The furniture below is the bill splitter MoneyFlow
+   carries, in this app's own colours — the two are meant to read as one
+   studio, and a bill is a bill.
+   ========================================================================== */
+.bill-build { margin-top: 4px; }
+
+.bill-block {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-2);
+}
+
+.bill-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.bill-head h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 750;
+    letter-spacing: -.01em;
+    color: var(--ink);
+}
+
+.bill-head .card-note { margin-left: auto; }
+.bill-head .card-note ~ .ghost-btn { margin-left: 0; }
+
+/* A checkbox with a setting hanging off it: the setting only appears once
+   the box is ticked, so an unticked line reads as one plain choice. */
+.check-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    user-select: none;
+}
+
+.check-line input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--azure);
+    cursor: pointer;
+}
+
+.check-line:hover { color: var(--ink); }
+
+.check-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.check-row .check-line { flex: 0 1 auto; }
+.check-row .seg.is-compact[hidden] { display: none; }
+
+/* One card per person, the things they had nested inside it. */
+.split-person {
+    padding: 14px 15px;
+    border: 1px solid var(--line-2);
+    border-radius: 14px;
+    background: var(--paper-2);
+}
+
+.split-person + .split-person { margin-top: 10px; }
+.split-person-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.split-person-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+.split-person-sum {
+    flex: 0 0 auto;
+    margin-left: auto;
+    font-size: 15px;
+    font-weight: 750;
+    color: var(--azure-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.split-x {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 11px;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background .16s ease, color .16s ease;
+}
+
+.split-x:hover { background: var(--red-soft); color: var(--red); }
+
+.split-items { display: grid; gap: 8px; }
+
+.split-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 130px 30px;
+    gap: 8px;
+    align-items: center;
+}
+
+.split-item-label { padding: 9px 12px; font-size: 13.5px; }
+
+/* A line carrying its own discount needs a fourth column. It is off by
+   default, so the ordinary row stays three fields wide. */
+.split-item.has-off { grid-template-columns: minmax(0, 1fr) 118px 104px 30px; }
+
+/* Money coming off reads as money coming off, not as a second price. */
+.money-input-sm.is-off .affix { color: var(--red); }
+.money-input-sm.is-off input { color: var(--red); }
+.money-input-sm.is-off:focus-within { border-color: var(--red); }
+.money-input-sm input.is-read { background: transparent; color: var(--ink-2); cursor: default; }
+
+.split-delivery,
+.split-pay-card {
+    margin-top: 12px;
+    padding: 14px 15px;
+    border: 1px solid var(--line-2);
+    border-radius: 14px;
+    background: var(--paper-2);
+}
+
+.split-delivery .field-grid { gap: 12px 14px; }
+
+.split-pay {
+    display: grid;
+    grid-template-columns: minmax(0, 150px) minmax(0, 1fr) 130px 30px;
+    gap: 8px;
+    align-items: center;
+}
+
+.split-pay > select,
+.split-pay-label { padding: 9px 12px; font-size: 13.5px; }
+.split-pay > select { font-weight: 650; }
+.split-pay-card .hint { margin-top: 10px; }
+
+/* Which lines a payment paid for: the same chips as "Shared by" under an
+   item, doing the same job one level up. They sit under the row rather than
+   inside it, because the row is a grid and a list of lines will not fit one. */
+.split-pay-lines {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: -2px 0 4px;
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--line);
+}
+
+.split-pay-lines:last-child { border-bottom: 0; padding-bottom: 0; }
+.split-pay-lines .split-chips { flex: 1 1 auto; }
+.split-pay-lines .split-empty { font-size: 12px; }
+
+/* Portions — a shared item that did not divide evenly. Off, it is a single
+   quiet line, so an ordinary shared dish costs no extra height. */
+.split-portions {
+    margin: -2px 0 4px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    transition: border-color .16s ease, background .16s ease;
+}
+
+.split-portions.is-on,
+.split-portions.has-out {
+    border-color: var(--line-2);
+    background: var(--paper-2);
+}
+
+.split-share { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.split-share-label { font-size: 11.5px; font-weight: 650; color: var(--ink-3); }
+.split-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.split-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 160px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 650;
+    color: var(--ink-4);
+    cursor: pointer;
+    transition: all .16s ease;
+}
+
+.split-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-chip i { font-size: 10px; }
+
+/* Out is the quiet state and in is the loud one, because "everyone" is the
+   default and the eye should be drawn to whoever is missing. */
+.split-chip.is-in { border-color: transparent; background: var(--azure-soft); color: var(--azure-ink); }
+.split-chip:hover { border-color: var(--azure); color: var(--azure-ink); }
+.split-chip.is-in:hover { background: var(--azure); color: var(--on-azure); }
+
+.split-share .split-portion-toggle { margin-left: auto; }
+
+.split-portion-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--paper);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .16s ease;
+}
+
+.split-portion-toggle:hover { border-color: var(--azure); background: var(--azure-soft); color: var(--azure-ink); }
+.split-portion-toggle i { font-size: 11px; }
+
+/* Inside the open box the button turns a mode off rather than on, so it
+   steps back: no fill until it is reached for. */
+.split-portion-toggle.is-on {
+    padding: 5px 10px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink-3);
+}
+
+.split-portion-toggle.is-on:hover { border-color: var(--line); background: var(--paper); color: var(--ink-2); }
+
+.split-portion-head { margin: 11px 0 8px; font-size: 12px; color: var(--ink-3); }
+.split-portion-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.split-portion-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.split-portion { display: flex; flex-direction: column; gap: 4px; flex: 0 1 118px; min-width: 0; }
+
+.split-portion > span {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.split-unit {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 650;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.split-portion-foot { margin: 9px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.split-portion-foot[hidden] { display: none; }
+
+.split-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--azure-ink);
+    cursor: pointer;
+}
+
+.split-add i { font-size: 10px; }
+.split-add:hover { text-decoration: underline; }
+
+.split-empty { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-3); }
+
+/* A fold. Service charge, tax and a discount are fields most bills leave at
+   zero, and they were taking the top of the block to say so. Folded away
+   they cost one line, and that line reports what is inside it — so a bill
+   with charges never hides them behind a shut door. */
+.fold {
+    margin-top: 4px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-2);
+}
+
+.fold > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink-2);
+    cursor: pointer;
+    list-style: none;
+}
+
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary:hover { color: var(--ink); }
+.fold > summary i { margin-right: 8px; color: var(--ink-3); }
+
+.fold > summary b { font-size: 12px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fold[open] > summary { border-bottom: 1px solid var(--line); }
+.fold[open] > summary b { color: var(--azure-ink); }
+.fold > .field-grid { padding: 18px 16px 4px; }
+.fold > .check-line { padding: 0 16px 16px; }
+.fold > .check-row { padding: 0 16px 16px; }
+.fold > .check-row .check-line { padding: 0; }
+.fold > .split-delivery { margin: 0 16px 16px; }
+
+/* The mark that says somebody put money down, on the row of the table that
+   says what they owe. */
+.tag.is-paid {
+    display: inline-block;
+    margin-left: 7px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--green-soft);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--green);
+    vertical-align: 1px;
+}
+
+@media (max-width: 720px) {
+    .split-item { grid-template-columns: minmax(0, 1fr) 110px 30px; }
+    .split-item.has-off { grid-template-columns: minmax(0, 1fr) 96px 88px 30px; }
+    .split-pay { grid-template-columns: minmax(0, 1fr) 30px; }
+    .split-pay > .split-pay-label,
+    .split-pay > .money-input-sm { grid-column: 1 / -1; }
+}
+
+/* Narrower than that and the name needs the whole line to itself: sharing
+   it with two money fields left 36px for "chicken rice". */
+@media (max-width: 560px) {
+    .split-item { grid-template-columns: minmax(0, 1fr) 30px; }
+    .split-item.has-off { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px; }
+    .split-item > .split-item-label { grid-column: 1 / -1; }
+}

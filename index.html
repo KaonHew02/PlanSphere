@@ -538,6 +538,17 @@
                             <label for="actDate">Date</label>
                             <input type="date" id="actDate">
                         </div>
+                        <!-- A birthday is the reason this field exists: it is the
+                             one entry nobody wants to type again next year. Put the
+                             date it first falls on and the calendar draws it on that
+                             day every year after. -->
+                        <div class="field">
+                            <label for="actRepeat">Repeats</label>
+                            <select id="actRepeat">
+                                <option value="">Once</option>
+                                <option value="year">Every year</option>
+                            </select>
+                        </div>
                         <div class="field">
                             <label for="actTime">Starts <span class="per">leave empty for all day</span></label>
                             <input type="time" id="actTime">

@@ -173,6 +173,11 @@
             summary: catOf(it.cat).mark + ' ' + it.title,
         }, when);
 
+        /* Yearly entries go over as one recurring event, the same way
+           they leave in the .ics — Google keeps the rule and draws the years
+           itself, so a birthday does not arrive four times. */
+        if (it.repeat === 'year') out.recurrence = ['RRULE:FREQ=YEARLY'];
+
         if (it.where) out.location = it.where;
         if (it.note) out.description = it.note;
 
@@ -220,7 +225,7 @@
             /* Holidays are left out for the same reason they are left out of
                the .ics: Google already knows them, and its own holiday
                calendar would end up doubled. */
-            const items = calItems().filter((it) => it.src !== 'holiday');
+            const items = calItems().filter((it) => it.src !== 'holiday' && !it.rep);
 
             let added = 0;
             let updated = 0;

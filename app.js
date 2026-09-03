@@ -3471,7 +3471,7 @@ function settleRow(t, from, to) {
 function settleWrite(t, from, to, change) {
     let row = settleRow(t, from, to);
     if (!row) {
-        row = { id: newId('st'), trip: t.id, from, to, paid: 0, cancelled: false };
+        row = { id: newId('st'), trip: t.id, from, to, paid: 0, cancelled: false, waived: false };
         db.settle.push(row);
     }
     Object.assign(row, change);
@@ -3485,11 +3485,19 @@ const SETTLE_STATUS = {
     pending:   { label: 'Pending',        tag: 'is-azure' },
     partly:    { label: 'Partially paid', tag: 'is-amber' },
     paid:      { label: 'Paid',           tag: 'is-green' },
+    waived:    { label: 'Waived',         tag: 'is-violet' },
     cancelled: { label: 'Cancelled',      tag: 'is-muted' },
 };
 
+/* Waived and cancelled both close a transfer without money moving, and they
+   are not the same thing. Cancelled says the transfer should never have been
+   there — a receipt typed against the wrong person, an arrangement called
+   off. Waived says it was right and the person owed let it go: the debt is
+   real, it is settled, and nobody paid it. Only the second is worth telling
+   the table about, which is why it keeps its own line in the summary. */
 function settleStatus(row, amount) {
     if (row && row.cancelled) return 'cancelled';
+    if (row && row.waived) return 'waived';
     const paid = row ? row.paid : 0;
     if (paid >= amount && amount > 0) return 'paid';
     if (paid > 0) return 'partly';
@@ -3537,6 +3545,7 @@ function settleSummaryText(t) {
         const state = settleStatus(row, tr.amount);
         lines.push(tr.fromName + ' → ' + tr.toName + ' ' + moneyIn(tr.amount, cur)
             + (state === 'paid' ? ' (paid)'
+                : state === 'waived' ? ' (waived)'
                 : state === 'cancelled' ? ' (cancelled)'
                 : state === 'partly' ? ' (' + moneyIn(Math.max(0, tr.amount - (row ? row.paid : 0)), cur) + ' left)'
                 : ''));
@@ -3624,14 +3633,23 @@ function paintSettle(t) {
         return { tr, row, paid, state, left: Math.max(0, tr.amount - paid) };
     });
 
-    const live = rows.filter((r) => r.state !== 'cancelled');
-    const owed = live.reduce((n, r) => n + r.tr.amount, 0);
-    const done = live.reduce((n, r) => n + Math.min(r.paid, r.tr.amount), 0);
+    /* A waived transfer is closed the same way a paid one is — it stops
+       counting against the total, because that money is never going to move.
+       It is not counted as handed over either: nobody handed it over. So the
+       waived part comes out of the bar and is named beside it instead, and
+       anything that did change hands before it was waived stays in both.  */
+    const live = rows.filter((r) => r.state !== 'cancelled' && r.state !== 'waived');
+    const gone = rows.filter((r) => r.state === 'waived');
+    const kept = gone.reduce((n, r) => n + Math.min(r.paid, r.tr.amount), 0);
+    const owed = live.reduce((n, r) => n + r.tr.amount, 0) + kept;
+    const done = live.reduce((n, r) => n + Math.min(r.paid, r.tr.amount), 0) + kept;
+    const off  = gone.reduce((n, r) => n + Math.max(0, r.tr.amount - r.paid), 0);
 
     /* Exact, like the cards under it — a summary that rounds while the rows
        it summarises do not is a summary that appears to disagree with them. */
     set('settleNote', plural(plan.length, 'transfer') + ' · '
-        + moneyIn(done, cur) + ' of ' + moneyIn(owed, cur) + ' handed over');
+        + moneyIn(done, cur) + ' of ' + moneyIn(owed, cur) + ' handed over'
+        + (off ? ' · ' + moneyIn(off, cur) + ' waived' : ''));
 
     html('settleList', ''
         + (owed
@@ -3655,7 +3673,8 @@ function settleCard(r, t, cur) {
             .join(' · ')
         : '';
 
-    return '<article class="settle-card' + (r.state === 'cancelled' ? ' is-off' : '') + '">'
+    return '<article class="settle-card' + (r.state === 'cancelled' ? ' is-off' : '')
+        + (r.state === 'waived' ? ' is-waived' : '') + '">'
         + '<div class="st-who">'
         +   '<span class="person-mark is-sm">' + esc(initials(r.tr.fromName)) + '</span>'
         +   '<span class="st-name">' + esc(r.tr.fromName) + '</span>'
@@ -3669,6 +3688,8 @@ function settleCard(r, t, cur) {
         +   '<b>' + moneyIn(r.tr.amount, cur) + '</b>'
         +   (r.state === 'partly'
                 ? '<span class="st-left">' + moneyIn(r.left, cur) + ' left</span>'
+                : r.state === 'waived' && r.paid > 0
+                ? '<span class="st-left is-off">' + moneyIn(r.left, cur) + ' waived</span>'
                 : '')
         + '</div>'
 
@@ -3680,13 +3701,20 @@ function settleCard(r, t, cur) {
         +   '<label class="st-paid"><span>Handed over</span>'
         +     '<div class="money-input is-bare"><input type="number" min="0" step="0.01" placeholder="0.00"'
         +       ' data-settle-paid="' + key + '" value="' + (r.paid ? esc(fromSen(r.paid)) : '') + '"'
-        +       (r.state === 'cancelled' ? ' disabled' : '') + '></div>'
+        +       (r.state === 'cancelled' || r.state === 'waived' ? ' disabled' : '') + '></div>'
         +   '</label>'
-        +   (r.state === 'cancelled'
+        +   (r.state === 'cancelled' || r.state === 'waived'
             ? '<button type="button" class="ghost-btn" data-settle-back="' + key + '">'
-                + '<i class="bi bi-arrow-counterclockwise"></i>Reopen</button>'
+                + '<i class="bi bi-arrow-counterclockwise"></i>'
+                + (r.state === 'waived' ? 'Undo' : 'Reopen') + '</button>'
             : '<button type="button" class="ghost-btn" data-settle-all="' + key + '">'
                 + '<i class="bi bi-check-lg"></i>' + (r.state === 'paid' ? 'Not yet' : 'All of it') + '</button>'
+              /* Between the two: nothing is owed any more, and nothing was
+                 paid. The person owed is the one who can say it, so the
+                 wording is theirs rather than the debtor's. */
+              + '<button type="button" class="ghost-btn" data-settle-waive="' + key + '"'
+                + ' title="' + esc(r.tr.toName) + ' lets this one go — the debt closes and nobody pays it">'
+                + '<i class="bi bi-slash-circle"></i>Waive</button>'
               + '<button type="button" class="ghost-btn is-danger" data-settle-off="' + key + '">'
                 + '<i class="bi bi-x-lg"></i>Cancel</button>')
         + '</div>'
@@ -6632,6 +6660,35 @@ function addMonths(iso, n) {
     return isoOf(d);
 }
 
+/**
+ * The same day in another year. 29 February falls back to the 28th, which
+ * is what the people born on it do — a birthday that disappears in three
+ * years out of four is a bug, not a fact about the calendar.
+ */
+function anniversary(iso, year) {
+    const month = iso.slice(5, 7);
+    const last = new Date(year, Number(month), 0).getDate();
+    return year + '-' + month + '-' + String(Math.min(Number(iso.slice(8, 10)), last)).padStart(2, '0');
+}
+
+/**
+ * The years a yearly entry is drawn in.
+ *
+ * A repeat has no end, and the calendar has no edge either — so the years
+ * are cut to the ones somebody can be looking at: where the cursor is,
+ * where today is, and one either side so paging never lands on a month
+ * that has lost a birthday it should have.
+ */
+function repeatYears() {
+    const here = Number((calCursor || today()).slice(0, 4));
+    const now = Number(today().slice(0, 4));
+    const out = [];
+    [here, now].forEach((year) => {
+        for (let y = year - 1; y <= year + 1; y++) if (out.indexOf(y) < 0) out.push(y);
+    });
+    return out;
+}
+
 /** Whole weeks covering the cursor's month — five rows or six, never a
     blank one padded on just to keep the box square. */
 function monthGrid(iso) {
@@ -6670,12 +6727,28 @@ function fmtMonth(iso) {
 function calItems() {
     const out = [];
 
-    db.events.forEach((e) => out.push({
-        src: 'event', id: e.id, cat: e.cat || 'personal', title: e.title,
-        date: e.date, time: e.time || '', end: e.end || '',
-        where: e.where || '', note: e.note || '', remind: e.remind,
-        movable: true,
-    }));
+    /* One record, one date — and, for a birthday, one date per year drawn
+       from it. The copies are marked `rep` so the places that mean the
+       *record* rather than the day it lands on — the .ics, Google, the
+       count beside a category — can keep counting it once. */
+    db.events.forEach((e) => {
+        const it = {
+            src: 'event', id: e.id, cat: e.cat || 'personal', title: e.title,
+            date: e.date, time: e.time || '', end: e.end || '',
+            where: e.where || '', note: e.note || '', remind: e.remind,
+            repeat: e.repeat === 'year' ? 'year' : '', movable: true,
+        };
+        out.push(it);
+        if (it.repeat !== 'year' || !e.date) return;
+
+        repeatYears().forEach((year) => {
+            const date = anniversary(e.date, year);
+            /* Never before the day it first fell on: a birthday put in this
+               year is not evidence of one last year. */
+            if (date <= e.date) return;
+            out.push(Object.assign({}, it, { date, rep: true }));
+        });
+    });
 
     /* Trips, events and activities all draw here, each in its own
        category's colour. An activity is one day, so `until` closes on the
@@ -6791,7 +6864,7 @@ function renderCal() {
 function paintCatBar() {
     const all = calItems();
     html('calCats', db.cats.map((c) => {
-        const n = all.filter((it) => it.cat === c.id).length;
+        const n = all.filter((it) => it.cat === c.id && !it.rep).length;
         return '<button type="button" class="cat-chip' + (calOff.has(c.id) ? '' : ' is-on')
             + '" style="' + tone(c) + '" data-cat="' + esc(c.id) + '" aria-pressed="' + (!calOff.has(c.id)) + '">'
             + '<span class="dot"></span>' + esc(c.mark) + ' ' + esc(c.label)
@@ -6835,7 +6908,8 @@ function monthChip(it, date) {
             + '<span class="n">' + esc(it.title) + '</span></button>';
     }
     return '<button type="button" class="cal-chip" style="' + toneOf(it.cat) + '" data-item="' + itemKey(it) + '"'
-        + (it.movable ? ' draggable="true"' : '') + ' title="' + esc(it.title) + '">'
+        + (it.movable ? ' draggable="true"' : '') + ' title="' + esc(it.title)
+        + (it.repeat === 'year' ? ' · every year' : '') + '">'
         + (it.time ? '<span class="t">' + fmtTimeTiny(it.time) + '</span>' : '')
         + '<span class="n">' + esc(it.title) + '</span></button>';
 }
@@ -6991,7 +7065,9 @@ function timelineRow(it) {
     return '<button type="button" class="cal-row" style="' + toneOf(it.cat) + '" data-item="' + itemKey(it) + '">'
         + '<span class="tm' + (it.time || it.span ? '' : ' is-none') + '">' + when + '</span>'
         + '<span class="disc cat" style="' + tone(c) + '">' + esc(c.mark) + '</span>'
-        + '<span><span class="nm">' + esc(it.title) + '</span>'
+        + '<span><span class="nm">' + esc(it.title)
+        + (it.repeat === 'year'
+            ? ' <i class="bi bi-arrow-repeat cal-rep" title="Every year"></i>' : '') + '</span>'
         + (it.where ? '<small class="wh">' + esc(it.where) + '</small>' : '') + '</span>'
         + (it.remind != null && it.remind !== '' ? '<i class="bi bi-bell-fill cal-bell" title="Reminder set"></i>' : '<span></span>')
         + '<span class="src">' + src.label + '</span>'
@@ -7217,7 +7293,7 @@ function paintCats() {
     if ($('catList').contains(document.activeElement)) return;
 
     html('catList', db.cats.map((c) => {
-        const used = all.filter((it) => it.cat === c.id).length;
+        const used = all.filter((it) => it.cat === c.id && !it.rep).length;
         return '<div class="cat-row" style="' + tone(c) + '">'
             + '<input class="cat-mark" type="text" maxlength="4" aria-label="Mark for ' + esc(c.label) + '"'
             +   ' data-cat-mark="' + esc(c.id) + '" value="' + esc(c.mark) + '">'
@@ -7353,7 +7429,7 @@ function buildIcs() {
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
     const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//PlanSphere//Travel//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
 
-    calItems().filter((it) => it.src !== 'holiday').forEach((it) => {
+    calItems().filter((it) => it.src !== 'holiday' && !it.rep).forEach((it) => {
         const cat = catOf(it.cat);
         lines.push('BEGIN:VEVENT');
         lines.push('UID:' + it.src + '-' + it.id + '@plansphere');
@@ -7369,6 +7445,10 @@ function buildIcs() {
             lines.push('DTSTART;VALUE=DATE:' + icsDay(it.date));
             lines.push('DTEND;VALUE=DATE:' + icsDay(shiftDate(it.date, 1)));
         }
+
+        /* A yearly entry is exported as one event with a rule on it, not as
+           four copies — that is what a calendar app knows how to keep. */
+        if (it.repeat === 'year') lines.push('RRULE:FREQ=YEARLY');
 
         lines.push('SUMMARY:' + icsText(cat.mark + ' ' + it.title));
         if (it.where) lines.push('LOCATION:' + icsText(it.where));
@@ -7407,7 +7487,7 @@ function exportIcs() {
     const alarms = db.events.filter((e) => e.remind !== '' && e.remind != null && e.time).length;
     toast('Saved <b>' + name + '</b> \u2014 a calendar file. Open it on your phone '
         + '(mail it to yourself, or AirDrop it) and your calendar app will import '
-        + plural(calItems().filter((it) => it.src !== 'holiday').length, 'entry', 'entries')
+        + plural(calItems().filter((it) => it.src !== 'holiday' && !it.rep).length, 'entry', 'entries')
         + (alarms ? ' with ' + plural(alarms, 'reminder') : '') + '.');
 }
 
@@ -7452,6 +7532,10 @@ function saveAct() {
         where: $('actWhere').value.trim(),
         note: $('actNote').value.trim(),
         remind: $('actRemind').value,
+        /* The date stored is still one date — the day it first falls on.
+           Every year after is worked out from it when the calendar draws,
+           so correcting the date corrects every year at once. */
+        repeat: $('actRepeat').value === 'year' ? 'year' : '',
     };
 
     if (editAct) {
@@ -7472,6 +7556,27 @@ function blankActForm() {
     $('actDate').value = calCursor || today();
     fillCatSelect('personal');
     $('actRemind').value = '';
+    $('actRepeat').value = '';
+    actCatPicked(true);
+}
+
+/**
+ * The category deciding the rest of the form.
+ *
+ * Birthdays are the one category where the defaults are known before
+ * anything is typed: it happens every year, it has no clock, and what goes
+ * in the What box is a person rather than an errand. So picking Birthday
+ * fills those in — and leaves them editable, because a 30th somebody is
+ * flying home for is still a birthday and still theirs to change.
+ */
+function actCatPicked(mayDefault) {
+    const birthday = $('actCat').value === 'birthday';
+    const rep = $('actRepeat');
+
+    /* Only ever a default, never a correction: an entry already saved as a
+       one-off keeps what it was saved as, however it is filed. */
+    if (mayDefault && birthday && !rep.value) rep.value = 'year';
+    $('actTitle').placeholder = birthday ? "Mum's birthday" : 'Dentist, 3pm';
 }
 
 function clearActForm() {
@@ -7504,6 +7609,8 @@ function openActEdit(id) {
     $('actWhere').value = e.where || '';
     $('actNote').value = e.note || '';
     $('actRemind').value = e.remind == null ? '' : String(e.remind);
+    $('actRepeat').value = e.repeat === 'year' ? 'year' : '';
+    actCatPicked(false);
     set('actFormTitle', 'Edit calendar entry');
     set('actSaveLabel', 'Save changes');
     setCancelBtn('actCancel', true);
@@ -7526,8 +7633,17 @@ function moveItem(key, date) {
     const bag = { event: db.events, stop: db.stops, book: db.books }[src];
     if (!bag) return false;
     const row = bag.find((r) => r.id === id);
-    if (!row || row.date === date) return false;
-    row.date = date;
+    if (!row) return false;
+
+    /* Dragging one year of a repeat moves the day it falls on, not the year
+       it started in — drop a birthday on the 14th and it is the 14th every
+       year, including the ones behind us. */
+    const to = row.repeat === 'year' && row.date
+        ? row.date.slice(0, 4) + date.slice(4)
+        : date;
+
+    if (row.date === to) return false;
+    row.date = to;
     save();
     return true;
 }
@@ -7576,9 +7692,15 @@ function checkReminders() {
 
     db.events.forEach((e) => {
         if (e.remind === '' || e.remind == null || !e.date || !e.time) return;
-        if (fired.has(e.id)) return;
 
-        const at = asDate(e.date);
+        /* A yearly entry is due on this year's anniversary, and the note
+           that it has already gone off is kept per year — otherwise the
+           first birthday reminder would be the only one. */
+        const on = e.repeat === 'year' ? anniversary(e.date, now.getFullYear()) : e.date;
+        const tag = e.repeat === 'year' ? e.id + ':' + on.slice(0, 4) : e.id;
+        if (fired.has(tag)) return;
+
+        const at = asDate(on);
         if (!at) return;
         at.setHours(0, 0, 0, 0);
         at.setMinutes(minutesOf(e.time) - Number(e.remind));
@@ -7590,11 +7712,11 @@ function checkReminders() {
 
         try {
             new Notification(catOf(e.cat).mark + '  ' + e.title, {
-                body: fmtDay(e.date) + ' · ' + fmtTime(e.time) + (e.where ? ' · ' + e.where : ''),
-                tag: e.id,
+                body: fmtDay(on) + ' · ' + fmtTime(e.time) + (e.where ? ' · ' + e.where : ''),
+                tag: tag,
             });
         } catch (err) { /* blocked mid-session; nothing useful to do */ }
-        markFired(e.id);
+        markFired(tag);
     });
 }
 
@@ -8090,6 +8212,7 @@ function start() {
         renderCal();
     });
 
+    $('actCat').addEventListener('change', () => actCatPicked(true));
     $('actSave').addEventListener('click', saveAct);
     $('actClear').addEventListener('click', blankActForm);
     $('actCancel').addEventListener('click', clearActForm);
@@ -8562,7 +8685,9 @@ function start() {
         const stPaid = event.target.closest('[data-settle-paid]');
         if (stPaid) {
             const [from, to] = stPaid.dataset.settlePaid.split(':');
-            return settleWrite(trip(), from, to, { paid: toSen(stPaid.value), cancelled: false });
+            /* Typing a figure into a closed row reopens it: money handed over
+               is the stronger claim, and it is the one somebody just made. */
+            return settleWrite(trip(), from, to, { paid: toSen(stPaid.value), cancelled: false, waived: false });
         }
 
         /* The bill's own fields. Each writes into the draft and repaints
@@ -8832,19 +8957,27 @@ function start() {
             /* The same button un-marks it, because the common mistake is
                pressing it on the wrong row. */
             const done = row && row.paid >= (tr ? tr.amount : 0);
-            return settleWrite(t, from, to, { paid: done ? 0 : (tr ? tr.amount : 0), cancelled: false });
+            return settleWrite(t, from, to, { paid: done ? 0 : (tr ? tr.amount : 0), cancelled: false, waived: false });
         }
 
         const stOff = hit('data-settle-off');
         if (stOff) {
             const [from, to] = stOff.split(':');
-            return settleWrite(trip(), from, to, { cancelled: true });
+            return settleWrite(trip(), from, to, { cancelled: true, waived: false });
+        }
+
+        /* Written off. Whatever was already handed over stays on the row —
+           it really did change hands, and waiving is about the rest. */
+        const stWaive = hit('data-settle-waive');
+        if (stWaive) {
+            const [from, to] = stWaive.split(':');
+            return settleWrite(trip(), from, to, { waived: true, cancelled: false });
         }
 
         const stBack = hit('data-settle-back');
         if (stBack) {
             const [from, to] = stBack.split(':');
-            return settleWrite(trip(), from, to, { cancelled: false });
+            return settleWrite(trip(), from, to, { cancelled: false, waived: false });
         }
 
         const who = hit('data-who');

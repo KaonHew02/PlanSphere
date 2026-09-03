@@ -3723,6 +3723,13 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
 
 .settle-card.is-off { opacity: .55; }
 
+/* Waived is not cancelled: the debt was real and it is closed, so the card
+   keeps its weight and the figure is struck through instead of faded out —
+   the amount still says how much was let go. */
+.settle-card.is-waived { background: var(--violet-soft); border-color: var(--violet-soft); }
+.settle-card.is-waived .st-figure b { text-decoration: line-through; color: var(--ink-3); }
+.st-left.is-off { color: var(--violet); }
+
 .st-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .st-name { font-size: 14px; font-weight: 650; color: var(--ink); overflow-wrap: anywhere; }
 .st-who > i { font-size: 13px; color: var(--ink-4); margin: 0 2px; }
@@ -4792,3 +4799,9 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
     .split-item.has-off { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px; }
     .split-item > .split-item-label { grid-column: 1 / -1; }
 }
+
+/* An entry that comes back every year says so where there is room for it —
+   the timeline row and the chip's tooltip. Small, and the colour of the
+   surrounding text rather than the category's, because it is a fact about
+   the entry rather than another thing to look at. */
+.cal-rep { font-size: 11px; color: var(--ink-4); vertical-align: 1px; }

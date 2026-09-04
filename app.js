@@ -902,6 +902,10 @@ function showModule(key) {
     });
 
     paintRecBar();
+    /* The counts on the tabs are per record, so opening a different one has
+       to redraw them. Without this they were whatever the last record left
+       behind: a bookings badge saying 1 over a screen saying nothing booked. */
+    paintCounts();
     MODULES[shown]();
 
     /* A new screen starts at its top. Landing halfway down one because that
@@ -2105,16 +2109,30 @@ function kindUse(id) {
         + db.books.filter((r) => (r.kind || 'travel') === id).length;
 }
 
+/* The Itinerary and the Bookings screen both file rows under these types,
+   and both are places somebody notices one is missing. So both carry the
+   editor. It is one list behind two windows, not two lists — a second list
+   is exactly the drift the kinds were declared once to avoid. */
+const KIND_LISTS = [['kindList', 'kindNote'], ['kindListBook', 'kindNoteBook']];
+
 function paintStopKinds() {
-    const list = $('kindList');
-    if (!list) return;
-    set('kindNote', plural(db.stopKinds.length, 'type'));
+    const rows = kindRows();
+    const note = plural(db.stopKinds.length, 'type');
 
-    /* Never rebuild a list somebody is typing in - the same guard the
-       categories and the trip types keep. */
-    if (list.contains(document.activeElement)) return;
+    KIND_LISTS.forEach(([listId, noteId]) => {
+        const list = $(listId);
+        if (!list) return;
+        set(noteId, note);
 
-    html('kindList', db.stopKinds.map((k) => {
+        /* Never rebuild a list somebody is typing in - the same guard the
+           categories and the trip types keep. */
+        if (list.contains(document.activeElement)) return;
+        html(listId, rows);
+    });
+}
+
+function kindRows() {
+    return db.stopKinds.map((k) => {
         const used = kindUse(k.id);
         return '<div class="cat-row kind-row" style="' + tone(k) + '">'
             + '<span class="disc is-tone"><i class="bi ' + k.icon + '"></i></span>'
@@ -2136,7 +2154,7 @@ function paintStopKinds() {
             +   (k.locked ? ' disabled title="Deleted types file their stops here, so it stays"' : ' title="Delete"')
             +   '><i class="bi bi-trash3"></i></button>'
             + '</div>';
-    }).join(''));
+    }).join('');
 }
 
 function addStopKind() {
@@ -2153,7 +2171,11 @@ function addStopKind() {
     save();
     repaint();
 
-    const box = $('kindList').querySelector('[data-kind-name="' + row.id + '"]');
+    /* Two lists hold this row now and only one of them is on screen. The
+       hidden one would take the caret nowhere, so the visible copy is the
+       one that gets it. */
+    const box = Array.from(document.querySelectorAll('[data-kind-name="' + row.id + '"]'))
+        .find((el) => el.offsetParent !== null);
     if (box) { box.focus(); box.select(); }
 }
 
@@ -3027,6 +3049,7 @@ function renderBook() {
        kindOf(), so it is offered the same list rather than a second one that
        could drift out of step with it. */
     fillKindSelect($('bookKind'), $('bookKind').value || 'travel');
+    paintStopKinds();
 
     const t = trip();
     if (!t) {
@@ -3650,6 +3673,14 @@ function paintSettle(t) {
     set('settleNote', plural(plan.length, 'transfer') + ' · '
         + moneyIn(done, cur) + ' of ' + moneyIn(owed, cur) + ' handed over'
         + (off ? ' · ' + moneyIn(off, cur) + ' waived' : ''));
+
+    /* Never rebuild the deck somebody is typing a figure into — the same
+       guard the categories and the type lists keep, and here it is what
+       lets a decimal be typed at all: half of "15.53" is "15.", which a
+       number input hands back as an empty string, so every rebuild threw
+       the point away and the field could only ever hold whole ringgit. */
+    const deck = $('settleList');
+    if (deck && deck.contains(document.activeElement)) return;
 
     html('settleList', ''
         + (owed
@@ -8183,7 +8214,10 @@ function start() {
         if (row) window.open(googleUrl(row), '_blank', 'noopener');
     });
     $('catAdd').addEventListener('click', addCat);
-    $('kindAdd').addEventListener('click', addStopKind);
+    ['kindAdd', 'kindAddBook'].forEach((id) => {
+        const btn = $(id);
+        if (btn) btn.addEventListener('click', addStopKind);
+    });
 
     document.addEventListener('change', (event) => {
         const pick = event.target.closest('[data-kind-icon]');
@@ -8579,7 +8613,7 @@ function start() {
         if (!form || event.target.tagName !== 'INPUT') return;
         /* The type and category lists are on the same screens as the forms
            but are not part of them — Enter there means "done", not "add". */
-        if (event.target.closest('#typeList, #catList, #kindList, #spendCatList, #spendParts, #budgetCats')) return event.target.blur();
+        if (event.target.closest('#typeList, #catList, #kindList, #kindListBook, #spendCatList, #spendParts, #budgetCats')) return event.target.blur();
         /* The card you are typing in decides, and the module only answers
            when the card does not — the Activities screen carries two forms
            now, so "the form on this screen" stopped being one thing. */
@@ -8665,6 +8699,13 @@ function start() {
         planFilter = btn.dataset.val;
         $('planFilter').querySelectorAll('button').forEach((b) => b.classList.toggle('is-on', b === btn));
         renderPlan();
+    });
+
+    /* paintSettle() leaves the deck alone while a figure is being typed into
+       it, so the row's tag, its "left" figure and the bar above catch up the
+       moment the caret leaves. */
+    document.addEventListener('focusout', (event) => {
+        if (event.target.closest && event.target.closest('[data-settle-paid]')) repaint();
     });
 
     document.addEventListener('input', (event) => {
@@ -8767,15 +8808,18 @@ function start() {
         }
 
         /* An activity type's name lands as it is typed too. The Show bar
-           and every disc on the page read this label, so they redraw - and
-           paintStopKinds() bails while the caret is in the row. */
+           and every disc on the page read this label, so whichever screen
+           is on redraws - and paintStopKinds() bails while the caret is in
+           the row. Whichever screen: the same rows are editable from the
+           Bookings tab now, and renderPlan() there would redraw a page
+           nobody is looking at. */
         const kindBox = event.target.closest('[data-kind-name]');
         if (kindBox) {
             const k = db.stopKinds.find((r) => r.id === kindBox.dataset.kindName);
             if (!k) return;
             k.label = kindBox.value;
             save();
-            return renderPlan();
+            return repaint();
         }
 
         /* Type names land as they are typed, like a category's does. */

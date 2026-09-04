@@ -845,6 +845,24 @@
                     <div id="bookList"></div>
                 </section>
 
+                <!-- The same editor the Itinerary carries, on the same list.
+                     A booking is where you notice a type is missing just as
+                     often as a stop is, and being sent to another tab to add
+                     one is how a form loses what was half typed into it. -->
+                <section class="card" data-fold="bookKinds">
+                    <div class="card-head">
+                        <h2>Booking types</h2>
+                        <div class="card-actions">
+                            <span class="card-note" id="kindNoteBook"></span>
+                            <button type="button" class="ghost-btn" id="kindAddBook">
+                                <i class="bi bi-plus-lg"></i>Add type
+                            </button>
+                        </div>
+                    </div>
+                    <div id="kindListBook"></div>
+                    <p class="hint"><i class="bi bi-info-circle"></i>Names save as you type. This is the one list of types every stop and every booking is filed under &mdash; edit it here or on the Itinerary, it is the same list. Deleting one files its rows under <b>Other</b>, which is why Other stays.</p>
+                </section>
+
             </div>
         </section>
 

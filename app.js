@@ -51,8 +51,14 @@ function esc(value) {
 }
 
 /* Money is counted in sen, so a budget never drifts by a fraction of a cent
-   after a few dozen additions. It only becomes a decimal on the way out. */
-const toSen   = (x) => Math.round((Number(x) || 0) * 100);
+   after a few dozen additions. It only becomes a decimal on the way out.
+
+   Anything that is not a finite number is worth nothing here. `Number('1e400')`
+   is Infinity and `Infinity || 0` is Infinity, so a typo used to travel into
+   the arithmetic as a real figure: it divides into Infinity shares, which
+   subtract to NaN at the settlement, and every figure downstream of it is NaN
+   with nothing on screen to say why. */
+const toSen   = (x) => { const n = Number(x); return Number.isFinite(n) ? Math.round(n * 100) : 0; };
 const fromSen = (s) => (s || 0) / 100;
 
 /* --------------------------------------------------------------------
@@ -3503,6 +3509,22 @@ function settleRow(t, from, to) {
     return db.settle.find((r) => r.trip === t.id && r.from === from && r.to === to) || null;
 }
 
+/**
+ * Drop the caret before a settlement row is rewritten by a press.
+ *
+ * Not every browser focuses a button when it is clicked — Safari does not —
+ * so the field somebody typed a figure into can still hold the focus while
+ * "All of it" is being pressed. paintSettle() would then see typing in the
+ * deck and leave it standing, and the press that asked for the redraw would
+ * be the one thing that could not have it. Typing does not come through
+ * here, so nothing takes the caret away mid-figure.
+ */
+function settleCaretOut() {
+    const deck = $('settleList');
+    const at = document.activeElement;
+    if (deck && at && at.blur && deck.contains(at)) at.blur();
+}
+
 function settleWrite(t, from, to, change) {
     let row = settleRow(t, from, to);
     if (!row) {
@@ -3950,19 +3972,31 @@ function billOf(x) {
    The floors are handed out first and the leftover sen go to the biggest
    remainders, which is the only division that is both fair and closed. */
 function allocate(totalSen, weights) {
-    if (!weights.length || totalSen <= 0) return weights.map(() => 0);
+    /* `!(x > 0)` rather than `x <= 0`, so a total that is NaN or Infinity
+       leaves here rather than being divided up: a share of a figure that is
+       not a number is not a number, and those go on to freeze the settlement. */
+    if (!weights.length || !Number.isFinite(totalSen) || !(totalSen > 0)) return weights.map(() => 0);
 
-    const sum = weights.reduce((n, w) => n + w, 0);
+    const safe = weights.map((w) => (Number.isFinite(w) ? w : 0));
+    const sum = safe.reduce((n, w) => n + w, 0);
     const exact = sum > 0
-        ? weights.map((w) => totalSen * w / sum)
-        : weights.map(() => totalSen / weights.length);
+        ? safe.map((w) => totalSen * w / sum)
+        : safe.map(() => totalSen / safe.length);
 
     const parts = exact.map(Math.floor);
     const order = exact
         .map((value, index) => ({ index, over: value - Math.floor(value) }))
         .sort((a, b) => b.over - a.over);
 
+    /* Flooring each share loses less than a sen apiece, so the gap to make up
+       is always smaller than the number of shares. Capping it says so out
+       loud: a figure big enough to lose precision on the way through stops
+       here rather than being handed out one sen at a time for as long as the
+       number is big. */
     let left = totalSen - parts.reduce((n, p) => n + p, 0);
+    if (!Number.isFinite(left) || left < 0) left = 0;
+    left = Math.min(left, order.length);
+
     for (let k = 0; left > 0; k++, left--) parts[order[k % order.length].index]++;
     return parts;
 }
@@ -8718,9 +8752,20 @@ function start() {
 
     /* paintSettle() leaves the deck alone while a figure is being typed into
        it, so the row's tag, its "left" figure and the bar above catch up the
-       moment the caret leaves. */
+       moment the caret leaves.
+
+       Unless the caret is leaving for a button in the same deck, which is a
+       press already under way: pressing one moves the focus off the field
+       first, and rebuilding here would take that button out of the document
+       between the press and the release. A click whose element has gone is
+       dispatched on whatever is left underneath — the deck — so the handler
+       looking for the button finds nothing and the press does nothing at
+       all. The press repaints on its own, which is what it is for. */
     document.addEventListener('focusout', (event) => {
-        if (event.target.closest && event.target.closest('[data-settle-paid]')) repaint();
+        if (!(event.target.closest && event.target.closest('[data-settle-paid]'))) return;
+        const deck = $('settleList');
+        if (deck && event.relatedTarget && deck.contains(event.relatedTarget)) return;
+        repaint();
     });
 
     document.addEventListener('input', (event) => {
@@ -9009,6 +9054,7 @@ function start() {
 
         const stAll = hit('data-settle-all');
         if (stAll) {
+            settleCaretOut();
             const t = trip();
             const [from, to] = stAll.split(':');
             const tr = settleTransfers(t).find((x) => x.from === from && x.to === to);
@@ -9021,6 +9067,7 @@ function start() {
 
         const stOff = hit('data-settle-off');
         if (stOff) {
+            settleCaretOut();
             const [from, to] = stOff.split(':');
             return settleWrite(trip(), from, to, { cancelled: true, waived: false });
         }
@@ -9029,12 +9076,14 @@ function start() {
            it really did change hands, and waiving is about the rest. */
         const stWaive = hit('data-settle-waive');
         if (stWaive) {
+            settleCaretOut();
             const [from, to] = stWaive.split(':');
             return settleWrite(trip(), from, to, { waived: true, cancelled: false });
         }
 
         const stBack = hit('data-settle-back');
         if (stBack) {
+            settleCaretOut();
             const [from, to] = stBack.split(':');
             return settleWrite(trip(), from, to, { cancelled: false, waived: false });
         }

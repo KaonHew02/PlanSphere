@@ -31,6 +31,18 @@ function html(id, markup) {
     if (el) el.innerHTML = markup;
 }
 
+/** True while somebody is typing inside this element — the one reason a
+    painter leaves its own markup standing rather than rebuilding it.
+
+    A pressed button is the focused element too, and that is not typing.
+    Guarding on focus alone therefore swallowed the very repaint the button
+    had just asked for: the row was written, saved, and redrawn nowhere. */
+function typingIn(el) {
+    const at = document.activeElement;
+    return !!(el && at && el.contains(at)
+        && (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.isContentEditable));
+}
+
 /** Anything a user typed goes through here before it meets innerHTML. */
 function esc(value) {
     return String(value == null ? '' : value)
@@ -2027,7 +2039,7 @@ function paintTypes() {
     set('typeNote', plural(db.types.length, 'type'));
 
     /* Never rebuild a list somebody is typing in. */
-    if ($('typeList').contains(document.activeElement)) return;
+    if (typingIn($('typeList'))) return;
 
     html('typeList', ['trip', 'event'].map((scope) => {
         const kin = scope === 'trip' ? KIN.trip : KIN.event;
@@ -2126,7 +2138,7 @@ function paintStopKinds() {
 
         /* Never rebuild a list somebody is typing in - the same guard the
            categories and the trip types keep. */
-        if (list.contains(document.activeElement)) return;
+        if (typingIn(list)) return;
         html(listId, rows);
     });
 }
@@ -3678,9 +3690,12 @@ function paintSettle(t) {
        guard the categories and the type lists keep, and here it is what
        lets a decimal be typed at all: half of "15.53" is "15.", which a
        number input hands back as an empty string, so every rebuild threw
-       the point away and the field could only ever hold whole ringgit. */
-    const deck = $('settleList');
-    if (deck && deck.contains(document.activeElement)) return;
+       the point away and the field could only ever hold whole ringgit.
+
+       A pressed button is not typing, which is why typingIn() asks what the
+       focus is in and not merely where it is: "All of it", Waive and Cancel
+       all sit inside the deck they redraw. */
+    if (typingIn($('settleList'))) return;
 
     html('settleList', ''
         + (owed
@@ -5152,7 +5167,7 @@ function paintSpendAtts() {
    ==================================================================== */
 function paintSpendCats() {
     set('spendCatNote', plural(db.spendCats.length, 'category', 'categories'));
-    if ($('spendCatList').contains(document.activeElement)) return;
+    if (typingIn($('spendCatList'))) return;
 
     html('spendCatList', db.spendCats.map((c) => {
         const used = db.spend.filter((x) => x.cat === c.id).length;
@@ -6058,7 +6073,7 @@ function paintBudgetCats(t) {
     set('budgetCatNote', set0 ? plural(set0, 'budget') + ' of ' + db.spendCats.length : 'none set');
 
     /* Never rebuild rows somebody is typing in. */
-    if ($('budgetCats').contains(document.activeElement)) return;
+    if (typingIn($('budgetCats'))) return;
 
     html('budgetCats', '<div class="cat-budgets">' + db.spendCats.map((c) => {
         const budget = cats[c.id] || 0;
@@ -6233,7 +6248,7 @@ function paintRates(t) {
     /* Never rebuild these rows while somebody is typing in one of them. The
        note above has already updated, and so has every total on the screen;
        the rows themselves are what the caret is sitting in. */
-    if ($('rateRows').contains(document.activeElement)) return;
+    if (typingIn($('rateRows'))) return;
 
     html('rateRows', used.map((c) => {
         const r = t.rates && t.rates[c];
@@ -7321,7 +7336,7 @@ function paintCats() {
 
     /* Never rebuild a list somebody is typing in — the input would be
        replaced under the caret on every keystroke. */
-    if ($('catList').contains(document.activeElement)) return;
+    if (typingIn($('catList'))) return;
 
     html('catList', db.cats.map((c) => {
         const used = all.filter((it) => it.cat === c.id && !it.rep).length;

@@ -45,7 +45,9 @@
  * ====================================================================
  */
 
-const PSStore = (() => {
+/* On window rather than a global const: app.js takes it and deletes it, so
+   the console never has a handle on the records. */
+window.PSStore = (() => {
 
     const DB_NAME = 'plansphere';
     const DB_VERSION = 1;

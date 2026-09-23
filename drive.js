@@ -188,13 +188,13 @@
     }
 
     async function readFile(id) {
-        const response = await call(`${API}/files/${id}?alt=media`);
+        const response = await call(`${API}/files/${encodeURIComponent(id)}?alt=media`);
         return response.json();
     }
 
     /** When Drive last saw a change, so a pull can say how old its copy is. */
     async function fileModified(id) {
-        const response = await call(`${API}/files/${id}?fields=modifiedTime`);
+        const response = await call(`${API}/files/${encodeURIComponent(id)}?fields=modifiedTime`);
         const body = await response.json();
         return body.modifiedTime || null;
     }
@@ -210,7 +210,7 @@
         const id = await findFile();
 
         if (id) {
-            await call(`${UPLOAD}/files/${id}?uploadType=media`, {
+            await call(`${UPLOAD}/files/${encodeURIComponent(id)}?uploadType=media`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body,
@@ -242,7 +242,7 @@
      * ------------------------------------------------------------------ */
 
     function notConfigured() {
-        ask('Drive is not set up yet',
+        PSApp.ask('Drive is not set up yet',
             'Paste your Google OAuth client ID into gcal-config.js — docs/DRIVE.md walks '
             + 'through making one, and the same client covers Calendar and Drive. Until then, '
             + 'Export and Import still work and still keep everything safe.', null);
@@ -262,11 +262,11 @@
         try {
             flash(btn, '<i class="bi bi-arrow-repeat"></i><span>Sending…</span>');
             await authorize(false);
-            await writeFile(psEnvelope());
+            await writeFile(PSApp.envelope());
             remember();
             flash(btn, '<i class="bi bi-check-lg"></i><span>In Drive</span>');
         } catch (err) {
-            ask('Could not save to Drive', err.message, null);
+            PSApp.ask('Could not save to Drive', err.message, null);
         }
     }
 
@@ -284,28 +284,28 @@
 
             const id = await findFile();
             if (!id) {
-                return ask('There is nothing in Drive yet',
+                return PSApp.ask('There is nothing in Drive yet',
                     'PlanSphere has not written to that folder before. Press “To Drive” first, and '
                     + 'this becomes the way to get everything onto another computer.', null);
             }
 
             const envelope = await readFile(id);
-            const held = psUnwrap(envelope);
+            const held = PSApp.unwrap(envelope);
             if (!held) {
-                return ask('That Drive file is not readable',
+                return PSApp.ask('That Drive file is not readable',
                     'The file in the folder is not a PlanSphere backup. Rename or remove it and '
                     + 'press “To Drive” to write a fresh one.', null);
             }
 
             const modified = (await fileModified(id) || '').slice(0, 10) || 'an unknown date';
 
-            ask('Replace what is here with the Drive copy?',
-                'Drive holds ' + psSummary(held) + ', last written ' + modified + '. '
-                + 'This browser holds ' + psSummary(db) + ', and all of it will be replaced. '
+            PSApp.ask('Replace what is here with the Drive copy?',
+                'Drive holds ' + PSApp.summary(held) + ', last written ' + modified + '. '
+                + 'This browser holds ' + PSApp.summary() + ', and all of it will be replaced. '
                 + 'If this machine has the newer plan, cancel and press “To Drive” instead.',
-                () => psApply(held));
+                () => PSApp.apply(held));
         } catch (err) {
-            ask('Could not read from Drive', err.message, null);
+            PSApp.ask('Could not read from Drive', err.message, null);
         }
     }
 
@@ -378,7 +378,7 @@
         }
 
         try {
-            await writeFile(psEnvelope());
+            await writeFile(PSApp.envelope());
             remember();
         } catch (err) {
             /* A failed automatic push is not worth a dialog in front of
@@ -490,7 +490,7 @@
     function offerPull() {
         const bar = $('driveOffer');
         if (!bar) return;
-        if (!configured() || typeof psIsEmpty !== 'function' || !psIsEmpty()) return;
+        if (!configured() || typeof PSApp === 'undefined' || !PSApp.isEmpty()) return;
         bar.hidden = false;
     }
 
@@ -508,7 +508,7 @@
 
         /* The only way in from app.js. It is a no-op when the switch is off,
            so save() needs to know nothing about any of this. */
-        window.PSDriveTouch = schedule;
+        Object.defineProperty(window, 'PSDriveTouch', { value: schedule });
 
         const offer = $('driveOfferPull');
         if (offer) {

@@ -44,3 +44,6 @@ const PS_GCAL = {
      */
     calendarName: 'PlanSphere',
 };
+
+/* Frozen, so nothing can swap the client this app signs in with. */
+Object.freeze(PS_GCAL);

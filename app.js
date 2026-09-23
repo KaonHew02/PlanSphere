@@ -16,6 +16,19 @@
  * ====================================================================
  */
 
+/* Everything in this file lives inside this one function rather than on
+   the page's global scope, so the browser console has no handle on it:
+   `db`, `save()` and every renderer are names a pasted snippet cannot
+   reach. The Drive and Calendar files are handed `PSApp` at the bottom,
+   and that is the whole of the surface. The body is not indented for it
+   — that would be a nine-thousand-line diff to say one thing. */
+(() => {
+
+/* store.js leaves the store on `window` for exactly one reader. It is
+   taken into this function and removed from the page. */
+const PSStore = window.PSStore;
+try { delete window.PSStore; } catch (err) { /* nothing to hide */ }
+
 /* ====================================================================
    HELPERS
    ==================================================================== */
@@ -49,6 +62,29 @@ function esc(value) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+/** True when a lookup table has this key itself. `TABLE[key] || fallback`
+    alone answers `constructor` or `toString` with a function, and the
+    screen that asked goes on to read .label off it and throws. */
+const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+/** A stored address about to become a link. Only web addresses are ever
+    made into one: esc() stops a quote breaking out of the attribute, but
+    it cannot stop `javascript:alert(1)` being a perfectly quoted href. */
+function safeUrl(url) {
+    const s = String(url == null ? '' : url).trim();
+    return /^https?:\/\//i.test(s) ? s : '#';
+}
+
+/** A category's mark is an emoji or two, typed into a box and drawn in a
+    dozen places. None of them is spelt with a bracket or a quote, so those
+    are taken out where a mark is written — the editors and psClean — and
+    every place that draws one can trust it. */
+const cleanMark = (s) => String(s == null ? '' : s).replace(/[<>&"'`]/g, '');
+
+/** An id about to go into a querySelector. A quote or a bracket in one is
+    a selector that throws, and a throw there stops the whole repaint. */
+const cssId = (id) => (window.CSS && CSS.escape ? CSS.escape(String(id)) : String(id).replace(/[^\w-]/g, '\\$&'));
 
 /* Money is counted in sen, so a budget never drifts by a fraction of a cent
    after a few dozen additions. It only becomes a decimal on the way out.
@@ -113,6 +149,12 @@ CUR_DATA.split('|').forEach((row) => {
 const CUR_ORDER = CUR_COMMON.filter((c) => CUR[c])
     .concat(Object.keys(CUR).filter((c) => CUR_COMMON.indexOf(c) < 0).sort());
 
+/** A currency code this app knows, or the home default. Codes come out of
+    the store and go into markup and into a rate-service URL, so one that is
+    not in CUR goes no further — and `CUR[x] || …` alone would answer
+    `constructor` with a function. */
+const knownCur = (code) => (own(CUR, code) ? code : 'MYR');
+
 /* Always to the currency's own decimal places, and there is no longer an
    option to drop them.
 
@@ -123,7 +165,7 @@ const CUR_ORDER = CUR_COMMON.filter((c) => CUR[c])
    Fifty-odd call sites each got to make that mistake independently, so the
    option is gone rather than audited. */
 function moneyIn(sen, cur) {
-    const c = CUR[cur] || CUR.MYR;
+    const c = CUR[knownCur(cur)];
     const value = fromSen(sen || 0);
     return c.pre + value.toLocaleString('en-MY', { minimumFractionDigits: c.dp, maximumFractionDigits: c.dp }) + c.post;
 }
@@ -131,7 +173,7 @@ function moneyIn(sen, cur) {
 /** The currency this trip counts in. Everything totalled is totalled here. */
 function homeCur() {
     const t = trip();
-    return (t && t.home) || 'MYR';
+    return knownCur(t && t.home);
 }
 
 /** Formats in the current trip's own money. For anything else, moneyIn. */
@@ -251,7 +293,9 @@ function shiftMonth(iso, by) {
 function fmtNum(iso) {
     if (!iso) return '—';
     const [y, m, d] = String(iso).split('-');
-    if (!y || !m || !d) return '—';
+    /* Digits only, so what comes back can go anywhere a date goes —
+       markup included — without asking where it came from. */
+    if (![y, m, d].every((p) => /^\d+$/.test(p || ''))) return '—';
     return d + '-' + m + '-' + y;
 }
 
@@ -336,7 +380,7 @@ function disc(kind, small) {
     /* The colour rides on the row rather than on a stylesheet class, because
        a kind somebody added five minutes ago has no class to ride on. */
     return '<span class="disc is-tone' + (small ? ' is-sm' : '') + '" style="' + tone(k) + '">'
-        + '<i class="bi ' + k.icon + '"></i></span>';
+        + '<i class="bi ' + esc(k.icon) + '"></i></span>';
 }
 
 function emptyState(icon, title, line) {
@@ -384,14 +428,17 @@ function load() {
     try {
         const raw = held(KEY);
         if (raw) {
+            /* Cleaned on the way in, the same as an import — see psClean. */
             const parsed = JSON.parse(raw);
-            db = Object.assign(db, parsed);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                db = Object.assign(db, psClean(parsed));
+            }
         }
     } catch (err) {
         /* A corrupt or unavailable store is not a crash — the session
            simply starts empty and the next save repairs it. */
     }
-    ['trips', 'stops', 'books', 'packs', 'events', 'cats', 'types', 'stopKinds', 'notes', 'spend', 'spendCats', 'docs', 'settle'].forEach((k) => {
+    STORE_LISTS.forEach((k) => {
         if (!Array.isArray(db[k])) db[k] = [];
     });
 
@@ -1280,12 +1327,12 @@ function paintSumSpend(t, sums) {
     html('sumSpend', ''
         + '<div class="dist">'
         +   rows.map((r) => '<i style="width:' + (r.sen / scale * 100).toFixed(2) + '%;'
-                + 'background:var(' + TONES[r.c.tone || 'slate'][0] + ')"></i>').join('')
+                + 'background:var(' + (TONES[r.c.tone] || TONES.slate)[0] + ')"></i>').join('')
         + '</div>'
         + '<div class="break-rows">'
         +   rows.map((r) => '<div class="break-row" style="' + tone(r.c) + '">'
                 + '<span class="dot"></span>'
-                + '<span class="br-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
+                + '<span class="br-name">' + esc(r.c.mark) + ' ' + esc(r.c.label) + '</span>'
                 + '<span class="br-val">' + money(r.sen) + '</span>'
                 + '<span class="br-pct">' + Math.round(r.sen / total * 100) + '%</span>'
                 + '</div>').join('')
@@ -1447,12 +1494,12 @@ function paintDashBreak(t) {
     html('dashBreak', ''
         + '<div class="dist">'
         +   rows.map((r) => '<i style="width:' + (r.sen / scale * 100).toFixed(2) + '%;'
-                + 'background:var(' + TONES[r.c.tone || 'slate'][0] + ')"></i>').join('')
+                + 'background:var(' + (TONES[r.c.tone] || TONES.slate)[0] + ')"></i>').join('')
         + '</div>'
         + '<div class="break-rows">'
         +   top.map((r) => '<div class="break-row" style="' + tone(r.c) + '">'
                 + '<span class="dot"></span>'
-                + '<span class="br-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
+                + '<span class="br-name">' + esc(r.c.mark) + ' ' + esc(r.c.label) + '</span>'
                 + '<span class="br-val">' + money(r.sen) + '</span>'
                 + '<span class="br-pct">' + Math.round(r.sen / total * 100) + '%</span>'
                 + '</div>').join('')
@@ -1484,7 +1531,7 @@ function paintDashSpend(t) {
         const c = spendCatOf(x.cat);
         const who = x.by ? nameOf(t, x.by) : '';
         return '<div class="line-row">'
-            + '<span class="disc cat is-sm" style="' + tone(c) + '">' + c.mark + '</span>'
+            + '<span class="disc cat is-sm" style="' + tone(c) + '">' + esc(c.mark) + '</span>'
             + '<div class="line-meta"><div class="line-name">'
             +   esc(x.merchant || x.desc || c.label) + '</div>'
             +   '<small class="line-sub">' + fmtDay(x.date)
@@ -1560,12 +1607,14 @@ function figure(label, value, foot) {
         + '<span class="sf-foot">' + esc(foot || '') + '</span></div>';
 }
 
+/* A bag with no prototype: the keys are whatever somebody typed, and a
+   packing group called "constructor" is a perfectly good group. */
 function groupBy(list, keyOf) {
     return list.reduce((bag, row) => {
         const k = keyOf(row);
         (bag[k] = bag[k] || []).push(row);
         return bag;
-    }, {});
+    }, Object.create(null));
 }
 
 /* ====================================================================
@@ -1596,7 +1645,7 @@ const KIN = {
 };
 
 const KIN_ORDER = ['trip', 'event', 'activity'];
-const kinOf = (k) => KIN[k] || KIN.trip;
+const kinOf = (k) => (own(KIN, k) ? KIN[k] : KIN.trip);
 
 /* Which category the calendar draws a record in.
 
@@ -1645,7 +1694,7 @@ const TRIP_STATUS = {
 };
 
 const STATUS_ORDER = ['draft', 'planning', 'upcoming', 'ongoing', 'completed', 'archived'];
-const statusOf = (s) => TRIP_STATUS[s] || TRIP_STATUS.planning;
+const statusOf = (s) => (own(TRIP_STATUS, s) ? TRIP_STATUS[s] : TRIP_STATUS.planning);
 
 /** The three that answer to the calendar rather than to a person. */
 const DATED_STATUS = ['upcoming', 'ongoing', 'completed'];
@@ -1815,8 +1864,8 @@ function tripCard(t) {
         +   '</div>'
 
         +   '<dl class="tc-facts">'
-        +     fact('bi-geo-alt-fill', kin.where, t.where || '—')
-        +     fact('bi-people-fill', 'Members', String(t.who || 1))
+        +     fact('bi-geo-alt-fill', kin.where, esc(t.where || '—'))
+        +     fact('bi-people-fill', 'Members', String(Number(t.who) || 1))
         +     fact('bi-wallet2', 'Budget', t.budget ? moneyIn(t.budget, cur) : '—')
         +     fact('bi-receipt', 'Committed',
                 '<span class="' + (over ? 'is-over' : '') + '">' + moneyIn(spent, cur) + '</span>')
@@ -2081,7 +2130,7 @@ function addType(scope) {
 
     /* Straight into the name, because "New type" is a placeholder and
        everybody's next move is to replace it. */
-    const box = $('typeList').querySelector('[data-type-name="' + row.id + '"]');
+    const box = $('typeList').querySelector('[data-type-name="' + cssId(row.id) + '"]');
     if (box) { box.focus(); box.select(); }
     return row.id;
 }
@@ -2153,7 +2202,7 @@ function kindRows() {
     return db.stopKinds.map((k) => {
         const used = kindUse(k.id);
         return '<div class="cat-row kind-row" style="' + tone(k) + '">'
-            + '<span class="disc is-tone"><i class="bi ' + k.icon + '"></i></span>'
+            + '<span class="disc is-tone"><i class="bi ' + esc(k.icon) + '"></i></span>'
             + '<input class="cat-name" type="text" aria-label="Name"'
             +   ' data-kind-name="' + esc(k.id) + '" value="' + esc(k.label) + '">'
             + '<select class="kind-icon" aria-label="Icon"'
@@ -2192,7 +2241,7 @@ function addStopKind() {
     /* Two lists hold this row now and only one of them is on screen. The
        hidden one would take the caret nowhere, so the visible copy is the
        one that gets it. */
-    const box = Array.from(document.querySelectorAll('[data-kind-name="' + row.id + '"]'))
+    const box = Array.from(document.querySelectorAll('[data-kind-name="' + cssId(row.id) + '"]'))
         .find((el) => el.offsetParent !== null);
     if (box) { box.focus(); box.select(); }
 }
@@ -2762,9 +2811,14 @@ function downloadAtt(att) {
         const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
         const a = document.createElement('a');
         a.href = url;
-        a.download = att.name || 'attachment';
+        /* The name is whatever the file that brought it said. A right-to-left
+           override (U+202E) can make `invoice.exe` read as if it ended in .pdf,
+           and a slash or a control character is not part of a file name. */
+        a.download = String(att.name || '')
+            .replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069\\/:*?"<>|]/g, '')
+            .trim() || 'attachment';
         document.body.appendChild(a);
-        a.click();
+        selfClick(a);
         a.remove();
         URL.revokeObjectURL(url);
     } catch (err) {
@@ -2809,7 +2863,7 @@ const NOTE_TYPE_ORDER = ['general', 'travel', 'event', 'meeting', 'reminder',
    their own trips; these are what a piece of information *is*, and each
    one carries a mark and a colour the rest of the screen is written
    against. Adding a tenth would be adding a mark and a tone, not a word. */
-const noteTypeOf = (id) => NOTE_TYPES[id] || NOTE_TYPES.general;
+const noteTypeOf = (id) => (own(NOTE_TYPES, id) ? NOTE_TYPES[id] : NOTE_TYPES.general);
 
 let editNote = null;
 let noteFilter = 'all';
@@ -2874,7 +2928,7 @@ function noteCard(n) {
         + noteBody(n.body || '')
         + (links.length
             ? '<div class="nc-links">' + links.map((l) =>
-                '<a class="nc-link" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">'
+                '<a class="nc-link" href="' + esc(safeUrl(l.url)) + '" target="_blank" rel="noopener noreferrer">'
                 + '<i class="bi bi-box-arrow-up-right"></i>' + esc(l.label || l.url) + '</a>').join('') + '</div>'
             : '')
         + (atts.length ? '<div class="nc-atts">' + atts.map((a, i) => noteAttChip(n.id, a, i)).join('') + '</div>' : '')
@@ -2930,8 +2984,8 @@ function paintNoteChips() {
     const all = trip() ? mine(db.notes) : [];
     const chip = (id, label, mark, toneRow, n, on) =>
         '<button type="button" class="cat-chip' + (on ? ' is-on' : '') + '" style="' + tone(toneRow) + '"'
-        + ' data-note-filter="' + id + '" aria-pressed="' + on + '">'
-        + '<span class="dot"></span>' + (mark ? mark + ' ' : '') + esc(label)
+        + ' data-note-filter="' + esc(id) + '" aria-pressed="' + on + '">'
+        + '<span class="dot"></span>' + (mark ? esc(mark) + ' ' : '') + esc(label)
         + (n ? ' <span class="n">' + n + '</span>' : '') + '</button>';
 
     html('noteChips', chip('all', 'All', '', { tone: 'slate' }, all.length, noteFilter === 'all')
@@ -3241,8 +3295,9 @@ function personCard(p, t) {
             ? '<div class="pc-reach">'
             +   (p.phone ? '<a href="tel:' + esc(p.phone.replace(/[^+\d]/g, '')) + '">'
                     + '<i class="bi bi-telephone"></i>' + esc(p.phone) + '</a>' : '')
-            +   (p.email ? '<a href="mailto:' + esc(p.email) + '">'
-                    + '<i class="bi bi-envelope"></i>' + esc(p.email) + '</a>' : '')
+            +   (p.email ? (/^[^\s@?&#/\\]+@[^\s@?&#/\\]+$/.test(p.email)
+                    ? '<a href="mailto:' + esc(p.email) + '"><i class="bi bi-envelope"></i>' + esc(p.email) + '</a>'
+                    : '<span><i class="bi bi-envelope"></i>' + esc(p.email) + '</span>') : '')
             + '</div>'
             : '')
 
@@ -3431,7 +3486,7 @@ function settlePlan(t) {
  * can be shown rather than asserted.
  */
 function settlePerPayer(t) {
-    const named = {};
+    const named = Object.create(null);
     peopleOf(t).forEach((x) => { named[x.id] = x.name; });
     const nameOf = (id) => named[id] || 'Someone (removed)';
 
@@ -3903,7 +3958,7 @@ function shareOut(x, t) {
 
 /** Everything one person put in, and everything they used. */
 function balances(t) {
-    const rows = {};
+    const rows = Object.create(null);
     peopleOf(t).forEach((p) => { rows[p.id] = { person: p, paid: 0, share: 0, gone: false }; });
 
     /* Somebody taken off the list is still on the expenses they were on,
@@ -4003,8 +4058,8 @@ function allocate(totalSen, weights) {
 
 /** The affix a money field wears: RM at home, the code anywhere else. */
 function curMark(cur) {
-    const code = cur || homeCur();
-    return (CUR[code] && CUR[code].pre.trim()) || code;
+    const code = knownCur(cur || homeCur());
+    return CUR[code].pre.trim() || code;
 }
 
 /**
@@ -4552,7 +4607,7 @@ function paintBillSums() {
     set('spendChargeSummary', bits.length ? bits.join(' · ') : 'None');
 
     c.who.forEach((id, i) => {
-        const box = document.querySelector('[data-bill-sum="' + id + '"]');
+        const box = document.querySelector('[data-bill-sum="' + cssId(id) + '"]');
         if (box) box.textContent = cash(c.paysSen[i]);
     });
 
@@ -4564,7 +4619,7 @@ function paintBillSums() {
     /* A payment that named lines is worth what those lines come to, and
        the box says so rather than asking. */
     spendBill.payments.forEach((pay) => {
-        const box = document.querySelector('[data-bill-pay-amount="' + pay.id + '"]');
+        const box = document.querySelector('[data-bill-pay-amount="' + cssId(pay.id) + '"]');
         if (box && box.readOnly) box.value = fromSen(c.payAmountSen[pay.id] || 0);
     });
 
@@ -4591,10 +4646,10 @@ function paintBillPortions(c) {
         const out = it.out || [];
         const plain = !it.byUnits && !out.length;
 
-        const count = document.querySelector('[data-bill-pn="' + it.id + '"]');
+        const count = document.querySelector('[data-bill-pn="' + cssId(it.id) + '"]');
         if (count) count.textContent = split.total ? String(split.total) : '—';
 
-        const foot = document.querySelector('[data-bill-pf="' + it.id + '"]');
+        const foot = document.querySelector('[data-bill-pf="' + cssId(it.id) + '"]');
         if (!foot) return;
 
         /* A dish shared by everybody, equally, needs no explanation —
@@ -4737,7 +4792,7 @@ function spendCard(x, t) {
 
     return '<article class="spend-card" style="' + tone(c) + '">'
         + '<div class="sc-top">'
-        +   '<span class="sc-cat">' + c.mark + ' ' + esc(c.label) + '</span>'
+        +   '<span class="sc-cat">' + esc(c.mark) + ' ' + esc(c.label) + '</span>'
         +   '<span class="sc-ref">' + esc(x.ref || '') + '</span>'
         +   '<span class="nc-acts">'
         +     '<button type="button" class="row-x is-edit" data-edit-spend="' + esc(x.id) + '" title="Edit"><i class="bi bi-pencil"></i></button>'
@@ -4825,7 +4880,7 @@ function paintSpendSummary(t, all, spent) {
         + '</div>'
         + '<div class="spend-bars">' + rows.map((r) => ''
             + '<div class="spend-bar" style="' + tone(r.c) + '">'
-            +   '<span class="sb-name">' + r.c.mark + ' ' + esc(r.c.label) + '</span>'
+            +   '<span class="sb-name">' + esc(r.c.mark) + ' ' + esc(r.c.label) + '</span>'
             +   '<span class="sb-track"><span class="sb-fill" style="width:' + Math.max(3, Math.round(r.sen / top * 100)) + '%"></span></span>'
             +   '<span class="sb-val">' + money(r.sen) + '</span>'
             +   '<span class="sb-pct">' + Math.round(r.sen / spent * 100) + '%</span>'
@@ -5077,7 +5132,7 @@ function fillSpendCatSelect(selected, into) {
     const el = into || $('spendCat');
     if (!el) return;
     el.innerHTML = db.spendCats.map((c) =>
-        '<option value="' + esc(c.id) + '">' + c.mark + '  ' + esc(c.label) + '</option>').join('');
+        '<option value="' + esc(c.id) + '">' + esc(c.mark) + '  ' + esc(c.label) + '</option>').join('');
     el.value = db.spendCats.some((c) => c.id === selected) ? selected
         : (db.spendCats[0] ? db.spendCats[0].id : '');
 }
@@ -5227,7 +5282,7 @@ function paintSpendCatChips() {
     const chip = (id, label, mark, toneRow, n, on) =>
         '<button type="button" class="cat-chip' + (on ? ' is-on' : '') + '" style="' + tone(toneRow) + '"'
         + ' data-sc-filter="' + esc(id) + '" aria-pressed="' + on + '">'
-        + '<span class="dot"></span>' + (mark ? mark + ' ' : '') + esc(label)
+        + '<span class="dot"></span>' + (mark ? esc(mark) + ' ' : '') + esc(label)
         + (n ? ' <span class="n">' + n + '</span>' : '') + '</button>';
 
     html('spendCatChips', chip('all', 'All', '', { tone: 'slate' }, all.length, spendCatFilter === 'all')
@@ -5295,7 +5350,11 @@ function dropSpendCat(id) {
    which is the whole reason it is worth doing here rather than posting a
    photograph of somebody's card receipt to a service.
    ==================================================================== */
-const OCR_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+/* An exact version and the hash of exactly that file: if anything else is
+   ever served under this name, the browser refuses to run it. The reader
+   fetches its own worker and engine from the same version's folder. */
+const OCR_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const OCR_SRI = 'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F';
 
 /* The eight things the spec says a camera is pointed at, plus the two the
    app already had words for. A receipt is the one that becomes an expense
@@ -5312,7 +5371,7 @@ const DOC_KINDS = {
 };
 
 const DOC_KIND_ORDER = ['receipt', 'invoice', 'flight', 'hotel', 'booking', 'ticket', 'travel', 'eventdoc'];
-const docKindOf = (k) => DOC_KINDS[k] || DOC_KINDS.receipt;
+const docKindOf = (k) => (own(DOC_KINDS, k) ? DOC_KINDS[k] : DOC_KINDS.receipt);
 
 let ocrLib = null;
 let scanStream = null;
@@ -5416,6 +5475,8 @@ function loadOcr() {
     return new Promise((done, fail) => {
         const tag = document.createElement('script');
         tag.src = OCR_CDN;
+        tag.integrity = OCR_SRI;
+        tag.crossOrigin = 'anonymous';
         tag.onload = () => {
             ocrLib = window.Tesseract;
             ocrLib ? done(ocrLib) : fail(new Error('loaded but empty'));
@@ -5798,7 +5859,7 @@ function paintDocChips() {
     const chip = (id, label, mark, toneRow, n, on) =>
         '<button type="button" class="cat-chip' + (on ? ' is-on' : '') + '" style="' + tone(toneRow) + '"'
         + ' data-doc-filter="' + esc(id) + '" aria-pressed="' + on + '">'
-        + '<span class="dot"></span>' + (mark ? mark + ' ' : '') + esc(label)
+        + '<span class="dot"></span>' + (mark ? esc(mark) + ' ' : '') + esc(label)
         + (n ? ' <span class="n">' + n + '</span>' : '') + '</button>';
 
     html('docChips', chip('all', 'All', '', { tone: 'slate' }, all.length, docFilter === 'all')
@@ -6116,7 +6177,7 @@ function paintBudgetCats(t) {
         const line = budgetLine(c.label, budget, actual);
 
         return '<div class="cat-budget is-' + line.state + '" style="' + tone(c) + '">'
-            + '<span class="cb-name">' + c.mark + ' ' + esc(c.label) + '</span>'
+            + '<span class="cb-name">' + esc(c.mark) + ' ' + esc(c.label) + '</span>'
             + '<div class="money-input is-bare cb-set">'
             +   '<input type="number" min="0" step="0.01" placeholder="no budget"'
             +     ' data-cat-budget="' + esc(c.id) + '" value="' + (budget ? esc(fromSen(budget)) : '') + '">'
@@ -6228,7 +6289,7 @@ function paintBudgetLedger(t) {
         sen: homeOf({ cost: x.amount, cur: x.cur }, t), raw: x.amount, cur: x.cur,
         mark: spendCatOf(x.cat).mark, label: spendCatOf(x.cat).label,
     })).concat(mine(db.books).filter((b) => b.status !== 'idea').map((b) => ({
-        when: b.date, what: b.title, from: STATUS[b.status].label + ' booking', firm: b.status === 'paid',
+        when: b.date, what: b.title, from: (STATUS[b.status] || STATUS.idea).label + ' booking', firm: b.status === 'paid',
         sen: homeOf(b, t), raw: b.cost, cur: b.cur,
         mark: '', label: kindOf(b.kind).label,
     }))).concat(mine(db.stops).filter((s) => s.cost && !s.from).map((s) => ({
@@ -6250,7 +6311,7 @@ function paintBudgetLedger(t) {
         + '<thead><tr><th>What</th><th>Category</th><th>From</th><th>When</th><th>Cost</th></tr></thead><tbody>'
         + rows.map((r) => '<tr' + (r.firm ? '' : ' class="is-soft"') + '>'
             + '<td><strong>' + esc(r.what || 'Untitled') + '</strong></td>'
-            + '<td>' + (r.mark ? r.mark + ' ' : '') + esc(r.label) + '</td>'
+            + '<td>' + (r.mark ? esc(r.mark) + ' ' : '') + esc(r.label) + '</td>'
             + '<td class="is-muted">' + esc(r.from) + '</td>'
             + '<td>' + (r.when ? fmtDay(r.when) : '—') + '</td>'
             + '<td class="is-strong">' + (r.cur && r.cur !== cur ? amount(r.raw, r.cur, t) : moneyIn(r.sen, cur)) + '</td>'
@@ -6269,7 +6330,7 @@ function paintBudgetLedger(t) {
    total; it never rewrites a stored amount.
    -------------------------------------------------------------------- */
 function paintRates(t) {
-    const home = t.home || 'MYR';
+    const home = knownCur(t.home);
     const used = currenciesUsed(t);
     $('rateCard').hidden = !used.length;
     if (!used.length) return;
@@ -6292,7 +6353,7 @@ function paintRates(t) {
             + '<span class="who">' + CUR[c].flag + ' ' + c + '<small>' + CUR[c].name
             +   ' · ' + moneyIn(spent, c) + ' in this trip</small></span>'
             + '<div class="money-input money-input-sm is-bare">'
-            +   '<input type="number" min="0" step="any" data-rate="' + c + '" value="' + (r || '') + '" placeholder="0.00">'
+            +   '<input type="number" min="0" step="any" data-rate="' + c + '" value="' + (Number(r) > 0 ? Number(r) : '') + '" placeholder="0.00">'
             + '</div>'
             + '<span class="eq">1 ' + home + ' = &hellip; ' + c + '</span>'
             + '</div>';
@@ -6547,13 +6608,189 @@ function psEnvelope() {
 
 /** The store inside a file, whichever shape it arrived in, or null.
  *  Files written before the envelope existed are the bare store, and they
- *  still open — a backup that stops working is not a backup. */
+ *  still open — a backup that stops working is not a backup.
+ *
+ *  What comes back has been through psClean: a file is somebody else's
+ *  JSON until proven otherwise. */
 function psUnwrap(parsed) {
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (parsed.format === BACKUP_FORMAT && parsed.data && Array.isArray(parsed.data.trips)) return parsed.data;
-    if (Array.isArray(parsed.trips)) return parsed;
-    return null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    let bag = null;
+    if (parsed.format === BACKUP_FORMAT && parsed.data && Array.isArray(parsed.data.trips)) bag = parsed.data;
+    else if (Array.isArray(parsed.trips)) bag = parsed;
+    return bag ? psClean(bag) : null;
 }
+
+/* --------------------------------------------------------------------
+   Cleaning a store that came from outside
+
+   Import and a Drive pull replace the whole store, and every screen then
+   draws from it — so a file carrying markup in an icon name, a
+   `javascript:` link, or a `__proto__` key would otherwise go straight
+   onto the page. load() runs what it reads back through here too: the
+   origin is shared with two other apps, and a store written before these
+   checks existed has never been through them.
+
+   Deliberately schema-light. The store's shape has changed often and will
+   again, so this does not list every record; it enforces what no genuine
+   record ever needs, by key name wherever the key turns up:
+
+     id, trip, by, stop, cat, kind, status, split, scope, from, to, …Id
+                     letters, digits, - and _ — what newId() makes, what
+                     every lookup key is, and what an ISO date is too.
+                     Never `constructor` or `toString`: a lookup table
+                     answers to those with a function, and the screen
+                     that asked throws.
+     who, out (a list)                  a list of those
+     type            the same, or a MIME type beside a data URL
+     cur, home       a three-letter currency code — it goes into a
+                     fetch URL as well as onto the page
+     rates           currency code → a positive number
+     date            yyyy-mm-dd;  time, end: hh:mm
+     amount, cost, budget, paid, qty, size   a finite number
+     name, title, label, body, note, …       a string — a number in one
+                     is kept as its digits, anything else is dropped
+     icon            a Bootstrap Icons class, `bi-…`, and nothing else
+     tone            a name TONES knows
+     mark            an emoji, so no bracket or quote
+     url             http or https
+     cover, data     a base64 data URL — a picture, or an attachment
+     country, homeCountry               a two-letter code
+
+   And one rule by record: a trip's `from` and `to` are its dates.
+
+   Every string still goes through esc() on the way to the page; this is
+   the second lock, not the first.
+   -------------------------------------------------------------------- */
+const STORE_LISTS = ['trips', 'stops', 'books', 'packs', 'events', 'cats', 'types', 'stopKinds', 'notes', 'spend', 'spendCats', 'docs', 'settle'];
+
+const CLEAN_DEPTH = 24;
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const DATA_URL = /^data:[a-z]+\/[\w.+-]+(?:;[\w.+-]+=[\w.+-]+)*;base64,[a-z0-9+/=\s]*$/i;
+const MIME = /^[a-z]+\/[\w.+-]+$/i;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const HH_MM = /^\d{1,2}:\d{2}(?::\d{2})?$/;
+
+const ID_KEYS = new Set(['id', 'trip', 'by', 'stop', 'cat', 'kind', 'status', 'split', 'scope', 'from', 'to', 'current']);
+const ID_LISTS = new Set(['who', 'out', 'items']);
+const NUM_KEYS = new Set(['amount', 'cost', 'budget', 'paid', 'qty', 'size']);
+const TEXT_KEYS = new Set(['name', 'title', 'label', 'body', 'note', 'desc', 'where', 'merchant',
+    'phone', 'email', 'ref', 'text', 'item', 'group']);
+/* Keys whose rule in cleanString has a safe answer for an empty string —
+   so a number or an object in one is treated as empty, and gets it. */
+const STRING_KEYS = new Set(['type', 'cur', 'home', 'date', 'time', 'end', 'icon', 'tone', 'mark',
+    'url', 'cover', 'data', 'country', 'homeCountry']);
+
+/** An id, a lookup key or a reference to one. Rewritten rather than
+    dropped, and rewritten the same way everywhere it appears, so a record
+    and the rows that point at it still meet afterwards. */
+function cleanId(s) {
+    const out = String(s).slice(0, 120).replace(/[^\w-]/g, '_');
+    return out in Object.prototype ? 'x_' + out : out;
+}
+
+function cleanString(s, key, parent) {
+    if (key === 'type') {
+        if (parent && !Array.isArray(parent) && typeof parent.data === 'string') {
+            return MIME.test(s) ? s : 'application/octet-stream';
+        }
+        return cleanId(s);
+    }
+    if (ID_KEYS.has(key) || /Id$/.test(key)) return cleanId(s);
+    if (ID_LISTS.has(key) && Array.isArray(parent)) return cleanId(s);
+    if (key === 'cur' || key === 'home') return /^[A-Z]{3}$/.test(s) ? s : 'MYR';
+    if (key === 'date') return ISO_DAY.test(s) ? s : '';
+    if (key === 'time' || key === 'end') return HH_MM.test(s) ? s : '';
+    if (key === 'icon') return /^bi-[a-z0-9-]{1,60}$/.test(s) ? s : 'bi-three-dots';
+    if (key === 'tone') return own(TONES, s) ? s : 'slate';
+    if (key === 'mark') return cleanMark(s);
+    if (key === 'url') return /^https?:\/\/\S+$/i.test(s.trim()) ? s.trim() : '';
+    if (key === 'cover') return /^data:image\//i.test(s) && DATA_URL.test(s) ? s : '';
+    if (key === 'data') return DATA_URL.test(s) ? s : '';
+    if (key === 'country' || key === 'homeCountry') return /^[A-Z]{2}$/.test(s) ? s : '';
+    return s;
+}
+
+function cleanValue(value, key, parent, depth) {
+    /* The keys every screen treats as text: a number in one is its digits,
+       and anything else in one would throw at the first .trim() or
+       .localeCompare() — on every repaint, from then on. */
+    if (TEXT_KEYS.has(key) && !Array.isArray(parent) && typeof value !== 'string') {
+        return (typeof value === 'number' && Number.isFinite(value)) || typeof value === 'boolean'
+            ? String(value) : '';
+    }
+    /* And the ones it does sums with. `'5' + 3` is '53', and a figure that
+       is an object is a .toFixed() that throws. */
+    if (NUM_KEYS.has(key) && !Array.isArray(parent) && typeof value !== 'number') {
+        const n = typeof value === 'string' ? Number(value) : NaN;
+        return Number.isFinite(n) ? n : 0;
+    }
+    /* A date that is a number is a .split() that throws. An id that is a
+       number is kept as its digits — wherever it is pointed at, the same
+       digits are — and one that is anything else is no id at all. */
+    if (!Array.isArray(parent) && typeof value !== 'string') {
+        if (STRING_KEYS.has(key)) return cleanString('', key, parent);
+        if ((ID_KEYS.has(key) || /Id$/.test(key)) && value !== null) {
+            return typeof value === 'number' && Number.isFinite(value) ? cleanId(String(value)) : '';
+        }
+    }
+    if (value === null || typeof value === 'boolean') return value;
+    /* JSON.parse('1e400') is Infinity, and Infinity poisons every sum it
+       touches. */
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') return cleanString(value, key, parent);
+    if (depth > CLEAN_DEPTH || typeof value !== 'object') return undefined;
+
+    if (Array.isArray(value)) {
+        return value.map((v) => cleanValue(v, key, value, depth + 1)).filter((v) => v !== undefined);
+    }
+
+    /* Exchange rates are a map of currency code to a figure, and both halves
+       reach the page. */
+    if (key === 'rates') {
+        const rates = {};
+        Object.keys(value).forEach((code) => {
+            const r = Number(value[code]);
+            if (/^[A-Z]{3}$/.test(code) && Number.isFinite(r) && r > 0) rates[code] = r;
+        });
+        return rates;
+    }
+
+    /* A fresh object, keys copied one at a time: `__proto__` from JSON is an
+       own property, and Object.assign would hand it to the prototype setter. */
+    const out = {};
+    Object.keys(value).forEach((k) => {
+        if (UNSAFE_KEYS.has(k)) return;
+        const v = cleanValue(value[k], k, value, depth + 1);
+        if (v !== undefined) out[k] = v;
+    });
+    return out;
+}
+
+function psClean(bag) {
+    const out = cleanValue(bag, '', null, 0) || {};
+    /* Every list is a list of records. Anything else in one is dropped, not
+       guessed at. */
+    STORE_LISTS.forEach((k) => {
+        out[k] = Array.isArray(out[k])
+            ? out[k].filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+            : [];
+    });
+    /* `from` and `to` are people on a settlement and a source on a stop, so
+       the key alone cannot say they are dates. On a trip they are. */
+    out.trips.forEach((t) => {
+        ['from', 'to'].forEach((k) => { if (own(t, k) && !ISO_DAY.test(t[k])) t[k] = ''; });
+        if (own(t, 'who') && typeof t.who !== 'number') t.who = Math.max(1, Math.round(Number(t.who))) || 1;
+    });
+    if (typeof out.current !== 'string' || !out.current) out.current = null;
+    if (typeof out.saved !== 'string') out.saved = null;
+    if (!out.homeCountry) out.homeCountry = 'MY';
+    return out;
+}
+
+/* A browser tab will try to parse whatever it is handed. A backup with a
+   hundred receipts on it is tens of megabytes; one that is far bigger is
+   not a backup, and parsing it would freeze the tab. */
+const IMPORT_MAX_BYTES = 100 * 1024 * 1024;
 
 /** What is in a store, in words, for the dialogs that ask before replacing. */
 function psSummary(bag) {
@@ -6597,12 +6834,19 @@ function exportAll() {
     a.href = url;
     a.download = 'plansphere-' + today() + '.json';
     document.body.appendChild(a);
-    a.click();
+    selfClick(a);
     a.remove();
     URL.revokeObjectURL(url);
 }
 
 function importAll(file) {
+    if (!file) return;
+    if (file.size > IMPORT_MAX_BYTES) {
+        return ask('That file is too big to be a backup',
+            'It is ' + fmtSize(file.size) + '. A PlanSphere backup with every receipt on it is '
+            + 'tens of megabytes, so this is not one — nothing was changed.', null);
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
         let parsed;
@@ -6622,6 +6866,8 @@ function importAll(file) {
             + 'disagreeing copies of the same trip is a worse answer than one.',
             () => psApply(bag));
     };
+    reader.onerror = () => ask('That file could not be read',
+        'The browser would not open it. Nothing was changed.', null);
     reader.readAsText(file);
 }
 
@@ -6691,7 +6937,7 @@ function catOf(id) {
 
 /** The two custom properties every chip, dot, disc and block reads. */
 function tone(cat) {
-    const pair = TONES[cat && cat.tone] || TONES.slate;
+    const pair = cat && own(TONES, cat.tone) ? TONES[cat.tone] : TONES.slate;
     return '--cc:var(' + pair[0] + ');--cc-soft:var(' + pair[1] + ')';
 }
 
@@ -6969,7 +7215,7 @@ function viewMonth(list) {
             return '<div class="cal-cell'
                 + (date.slice(0, 7) === month ? '' : ' is-out')
                 + (date === now ? ' is-today' : '')
-                + '" data-day="' + date + '">'
+                + '" data-day="' + esc(date) + '">'
                 + '<span class="cal-daynum">' + Number(date.slice(8)) + '</span>'
                 + shown.map((it) => monthChip(it, date)).join('')
                 + (rest > 0 ? '<button type="button" class="cal-more" data-open-day="' + date + '">+' + rest + ' more</button>' : '')
@@ -6984,10 +7230,10 @@ function monthChip(it, date) {
         const end = date === it.until;
         return '<button type="button" class="cal-chip is-span'
             + (start ? ' is-start' : '') + (end ? ' is-end' : '') + (!start && !end ? ' is-mid' : '')
-            + '" style="' + toneOf(it.cat) + '" data-item="' + itemKey(it) + '" title="' + esc(it.title) + '">'
+            + '" style="' + toneOf(it.cat) + '" data-item="' + esc(itemKey(it)) + '" title="' + esc(it.title) + '">'
             + '<span class="n">' + esc(it.title) + '</span></button>';
     }
-    return '<button type="button" class="cal-chip" style="' + toneOf(it.cat) + '" data-item="' + itemKey(it) + '"'
+    return '<button type="button" class="cal-chip" style="' + toneOf(it.cat) + '" data-item="' + esc(itemKey(it)) + '"'
         + (it.movable ? ' draggable="true"' : '') + ' title="' + esc(it.title)
         + (it.repeat === 'year' ? ' · every year' : '') + '">'
         + (it.time ? '<span class="t">' + fmtTimeTiny(it.time) + '</span>' : '')
@@ -7046,7 +7292,7 @@ function viewGrid(list, days) {
     }).join('');
 
     out += '<div class="cal-allday-label">All day</div>';
-    out += perDay.map((p) => '<div class="cal-allday" data-day="' + p.date + '">'
+    out += perDay.map((p) => '<div class="cal-allday" data-day="' + esc(p.date) + '">'
         + p.allDay.map((it) => monthChip(it, p.date)).join('') + '</div>').join('');
 
     out += '<div class="cal-hours" style="height:' + height + 'px">'
@@ -7059,7 +7305,7 @@ function viewGrid(list, days) {
 
     out += perDay.map((p) => {
         const packed = pack(p.timed);
-        let col = '<div class="cal-col' + (p.date === now ? ' is-today' : '') + '" data-day="' + p.date
+        let col = '<div class="cal-col' + (p.date === now ? ' is-today' : '') + '" data-day="' + esc(p.date)
             + '" style="height:' + height + 'px;background-image:' + rules + '">';
 
         if (p.date === now && nowMins >= lo && nowMins <= hi) {
@@ -7071,7 +7317,7 @@ function viewGrid(list, days) {
             const h = Math.max(20, (r.end - r.start) / 60 * HOUR_PX);
             const w = 100 / packed.lanes;
             return '<button type="button" class="cal-block' + (h < 34 ? ' is-short' : '') + '"'
-                + ' data-item="' + itemKey(r.it) + '"' + (r.it.movable ? ' draggable="true"' : '')
+                + ' data-item="' + esc(itemKey(r.it)) + '"' + (r.it.movable ? ' draggable="true"' : '')
                 + ' style="' + toneOf(r.it.cat) + ';top:' + top.toFixed(1) + 'px;height:' + h.toFixed(1) + 'px;'
                 + 'left:calc(' + (r.lane * w).toFixed(2) + '% + 3px);width:calc(' + w.toFixed(2) + '% - 6px)">'
                 + '<span class="t">' + fmtTime(r.it.time) + '</span>'
@@ -7142,7 +7388,7 @@ function timelineRow(it) {
         ? (it.date === it.until ? 'All day' : 'Until ' + fmtDay(it.until))
         : it.time ? fmtTime(it.time) : 'Any time';
 
-    return '<button type="button" class="cal-row" style="' + toneOf(it.cat) + '" data-item="' + itemKey(it) + '">'
+    return '<button type="button" class="cal-row" style="' + toneOf(it.cat) + '" data-item="' + esc(itemKey(it)) + '">'
         + '<span class="tm' + (it.time || it.span ? '' : ' is-none') + '">' + when + '</span>'
         + '<span class="disc cat" style="' + tone(c) + '">' + esc(c.mark) + '</span>'
         + '<span><span class="nm">' + esc(it.title)
@@ -7173,7 +7419,13 @@ function timelineRow(it) {
    needs it, and a calendar should paint before it goes looking.
    ==================================================================== */
 const HOL_KEY = 'plansphere.holidays.v1';
-const HOL_CDN = 'https://cdn.jsdelivr.net/npm/date-holidays@3/+esm';
+/* An exact version, not `@3`. A floating tag runs whatever was published
+   last, in this page, with every trip in reach — so a release has to be
+   chosen, not merely exist. jsDelivr pins the library's own dependencies
+   inside the bundle. The rules for next year's holidays arrive in new
+   releases, so this wants moving forward about once a year — see
+   docs/SECURITY.md. */
+const HOL_CDN = 'https://cdn.jsdelivr.net/npm/date-holidays@3.37.0/+esm';
 
 /* Curated rather than complete. The library knows 206 countries; a select
    with 206 rows in it is a worse control than one with the places people
@@ -7206,8 +7458,20 @@ let holLib = null;
 let holState = 'idle';  /* idle | loading | ready | fail */
 
 function holLoad() {
-    try { holCache = JSON.parse(localStorage.getItem(HOL_KEY) || '{}'); }
-    catch (err) { holCache = {}; }
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(HOL_KEY) || '{}'); }
+    catch (err) { raw = null; }
+
+    /* localStorage is shared with every app on this origin, and these rows
+       are drawn onto the calendar and into its markup — so only what this
+       file itself writes is kept: `MY-2026` → [{ date: yyyy-mm-dd, name }]. */
+    holCache = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    Object.keys(raw).forEach((key) => {
+        if (!/^[A-Z]{2}-\d{4}$/.test(key) || !Array.isArray(raw[key])) return;
+        holCache[key] = raw[key].filter((h) => h && typeof h === 'object'
+            && typeof h.date === 'string' && ISO_DAY.test(h.date) && typeof h.name === 'string');
+    });
 }
 
 function holSave() {
@@ -7489,7 +7753,7 @@ function dropCat(id) {
 function icsText(v) {
     return String(v == null ? '' : v)
         .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
-        .replace(/\r?\n/g, '\\n');
+        .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 const icsDay = (iso) => iso.replace(/-/g, '');
@@ -7558,7 +7822,7 @@ function exportIcs() {
     const name = 'plansphere-' + today() + '.ics';
     a.download = name;
     document.body.appendChild(a);
-    a.click();
+    selfClick(a);
     a.remove();
     URL.revokeObjectURL(url);
 
@@ -7839,6 +8103,10 @@ let fxState = 'idle';   /* idle | loading | ok | fail */
 function fxLoad() {
     try { fx = JSON.parse(localStorage.getItem(FX_KEY) || 'null'); }
     catch (err) { fx = null; }
+    /* localStorage is shared with every app on this origin, so a cache that
+       is not the shape this one writes is somebody else's, and is dropped. */
+    if (!fx || typeof fx !== 'object' || !own(CUR, fx.base)
+        || !fx.rates || typeof fx.rates !== 'object' || typeof fx.day !== 'string') fx = null;
 }
 
 function fxSave() {
@@ -7858,13 +8126,13 @@ const fxFresh = () => !!(fx && fx.day === today());
 
 const FX_SOURCES = [
     {
-        url: (base) => 'https://open.er-api.com/v6/latest/' + base,
+        url: (base) => 'https://open.er-api.com/v6/latest/' + encodeURIComponent(base),
         read: (j) => (j && j.result === 'success' && j.rates)
             ? { rates: j.rates, date: (j.time_last_update_utc || '').slice(5, 16) }
             : null,
     },
     {
-        url: (base) => 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/' + base.toLowerCase() + '.json',
+        url: (base) => 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/' + encodeURIComponent(base.toLowerCase()) + '.json',
         read: (j, base) => {
             const key = base.toLowerCase();
             if (!j || !j[key]) return null;
@@ -7876,6 +8144,9 @@ const FX_SOURCES = [
 ];
 
 async function fxFetch(base) {
+    /* The code goes into the request path. One this app does not know is
+       not asked about — `../` in it would be a different file entirely. */
+    if (!own(CUR, base)) return null;
     if (fxState === 'loading') return null;
     fxState = 'loading';
     paintFx();
@@ -7962,8 +8233,8 @@ function paintFxLine(id, base, quote, typed) {
     el.className = 'fx-line ' + (stale ? 'is-stale' : 'is-live');
 
     let out = '<span class="pip"></span>'
-        + '<span>Mid-market ' + fxStamp() + ': <b>1 ' + base + ' = '
-        + fxTidy(mid).toLocaleString('en-MY', { maximumFractionDigits: 6 }) + ' ' + quote + '</b></span>'
+        + '<span>Mid-market ' + fxStamp() + ': <b>1 ' + esc(base) + ' = '
+        + fxTidy(mid).toLocaleString('en-MY', { maximumFractionDigits: 6 }) + ' ' + esc(quote) + '</b></span>'
         + '<span class="caveat">A changer keeps a margin, so you will be offered less than this.</span>';
 
     /* The comparison is the reason to fetch at all: it turns a number on a
@@ -7984,8 +8255,7 @@ function paintFxLine(id, base, quote, typed) {
 function paintRateFx() {
     const el = $('rateFx');
     if (!el) return;
-    const t = trip();
-    const home = (t && t.home) || 'MYR';
+    const home = homeCur();
 
     if (fxState === 'loading') {
         el.hidden = false;
@@ -8006,7 +8276,7 @@ function paintRateFx() {
 async function fillTripRates() {
     const t = trip();
     if (!t) return;
-    const home = t.home || 'MYR';
+    const home = knownCur(t.home);
     if (!fxFresh()) await fxFetch(fxBase());
 
     const used = currenciesUsed(t);
@@ -8116,7 +8386,7 @@ function paintLadder(rate, from, to) {
 
     set('convLadderNote', from + ' → ' + to);
     html('convLadder',
-        '<thead><tr><th>' + from + '</th><th>' + to + '</th></tr></thead><tbody>'
+        '<thead><tr><th>' + esc(from) + '</th><th>' + esc(to) + '</th></tr></thead><tbody>'
         + steps.map((n) => {
             const sen = toSen(n);
             const got = convDir === 'out' ? Math.round(sen * rate) : Math.round(sen / rate);
@@ -8286,7 +8556,7 @@ function start() {
         const cat = db.cats.find((c) => c.id === (name ? el.dataset.catName : el.dataset.catMark));
         if (!cat) return;
         if (name) cat.label = el.value;
-        else cat.mark = el.value || '\u{1F516}';
+        else cat.mark = cleanMark(el.value) || '\u{1F516}';
         save();
         /* Everything downstream re-reads; the row being typed in is left
            alone by the guard at the top of paintCats. */
@@ -8451,7 +8721,7 @@ function start() {
         toast('Added a calendar · name and colour it under <b>Categories</b> on this screen.');
     });
 
-    $('tripCoverAdd').addEventListener('click', () => $('tripCoverFile').click());
+    $('tripCoverAdd').addEventListener('click', () => selfClick($('tripCoverFile')));
     $('tripCoverDrop').addEventListener('click', () => { coverHeld = ''; paintCover(); });
     $('tripCoverFile').addEventListener('change', (event) => {
         takeCover(event.target.files && event.target.files[0]);
@@ -8484,7 +8754,7 @@ function start() {
     $('scanOpen').addEventListener('click', scanCamera);
     $('scanShoot').addEventListener('click', scanCapture);
     $('scanAgain').addEventListener('click', scanReset);
-    $('scanPick').addEventListener('click', () => $('scanFileInput').click());
+    $('scanPick').addEventListener('click', () => selfClick($('scanFileInput')));
     $('scanFileInput').addEventListener('change', (event) => {
         const file = event.target.files && event.target.files[0];
         event.target.value = '';
@@ -8598,7 +8868,7 @@ function start() {
     $('spendCur').addEventListener('change', () => { if (spendSplit === 'items') paintBill(); });
     $('spendBy').addEventListener('change', () => { if (spendSplit === 'items') paintBillSums(); });
 
-    $('spendReceiptAdd').addEventListener('click', () => $('spendReceiptFile').click());
+    $('spendReceiptAdd').addEventListener('click', () => selfClick($('spendReceiptFile')));
     
     $('spendReceiptDrop').addEventListener('click', () => { receiptHeld = null; paintReceipt(); });
     $('spendReceiptFile').addEventListener('change', (event) => {
@@ -8606,7 +8876,7 @@ function start() {
         event.target.value = '';
     });
 
-    $('spendAttAdd').addEventListener('click', () => $('spendAttFile').click());
+    $('spendAttAdd').addEventListener('click', () => selfClick($('spendAttFile')));
     $('spendAttFile').addEventListener('change', (event) => {
         [...(event.target.files || [])].forEach((file) => {
             readAtt(file, (att) => { spendAtts.push(att); paintSpendAtts(); });
@@ -8619,7 +8889,7 @@ function start() {
     $('noteCancel').addEventListener('click', closeNoteForm);
     $('noteSave').addEventListener('click', saveNote);
 
-    $('noteAttAdd').addEventListener('click', () => $('noteAttFile').click());
+    $('noteAttAdd').addEventListener('click', () => selfClick($('noteAttFile')));
     $('noteAttFile').addEventListener('change', (event) => {
         /* Read one at a time and paint after each, so a slow file does not
            hold up the ones behind it. */
@@ -8629,7 +8899,7 @@ function start() {
         event.target.value = '';
     });
 
-    $('stopAttAdd').addEventListener('click', () => $('stopAttFile').click());
+    $('stopAttAdd').addEventListener('click', () => selfClick($('stopAttFile')));
     $('stopAttDrop').addEventListener('click', () => { attHeld = null; paintAtt(); });
     $('stopAttFile').addEventListener('change', (event) => {
         takeAtt(event.target.files && event.target.files[0]);
@@ -8654,7 +8924,7 @@ function start() {
         const card = event.target.closest && event.target.closest('.trip-card');
         if (card && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault();
-            return card.click();
+            return selfClick(card);
         }
 
         if (event.key !== 'Enter' || event.target.tagName === 'TEXTAREA') return;
@@ -8669,7 +8939,7 @@ function start() {
         const own = event.target.closest('.card');
         const btn = (own && SAVE_BTNS.find((id) => own.querySelector('#' + id)))
             || { 'module-trips': 'tripSave', 'module-plan': 'stopSave', 'module-book': 'bookSave', 'module-spend': 'spendSave', 'module-pack': 'packSave' }[form.id];
-        if (btn) { event.preventDefault(); $(btn).click(); }
+        if (btn) { event.preventDefault(); selfClick($(btn)); }
     });
 
     $('packReset').addEventListener('click', () => {
@@ -8694,7 +8964,7 @@ function start() {
     $('dataBox').addEventListener('click', (event) => { if (event.target.id === 'dataBox') closeData(); });
 
     $('toolExport').addEventListener('click', exportAll);
-    $('toolImport').addEventListener('click', () => $('toolFile').click());
+    $('toolImport').addEventListener('click', () => selfClick($('toolFile')));
     $('toolFile').addEventListener('change', (event) => {
         const file = event.target.files && event.target.files[0];
         closeData();
@@ -8862,7 +9132,7 @@ function start() {
             const row = db.spendCats.find((c) => c.id === id);
             if (!row) return;
             if (scBox.dataset.scName) row.label = scBox.value;
-            else row.mark = scBox.value;
+            else row.mark = cleanMark(scBox.value);
             save();
             return renderSpend();
         }
@@ -9313,4 +9583,134 @@ function start() {
     });
 }
 
+/* ====================================================================
+   TAMPER GUARD
+
+   What a page can do about the person at the keyboard, and what it
+   cannot. It cannot stop them reading the code, or changing what is on
+   their own screen: the browser is theirs, and whatever they change there
+   changes their own copy and nobody else's. docs/SECURITY.md has the
+   whole of that. What it can do is take away the easy handles, so that
+   changing anything takes more than pasting a snippet into the console:
+
+     This file lives inside one function (see the top), so the records
+     and every function that writes them are out of the console's reach.
+
+     A click, a keystroke or a typed value only counts when it came from
+     a real mouse or keyboard. el.click() or dispatchEvent() from the
+     console is dropped before any handler on the page sees it. The app's
+     own programmatic clicks — a download, a file picker — go through
+     selfClick(), which is the one way past, and it is in here too.
+
+     On the published site the developer-tool shortcuts and the
+     right-click menu are switched off, the page hides itself while the
+     developer tools are open, and the console carries a warning for
+     anybody who has been told to paste something into it. On localhost
+     none of that runs, because that is where the app is worked on.
+   ==================================================================== */
+let selfEvent = false;
+
+/** The app clicking something itself: a download link, a file picker. */
+function selfClick(el) {
+    if (!el) return;
+    selfEvent = true;
+    try { el.click(); } finally { selfEvent = false; }
+}
+
+/* Registered before anything else on the page listens, on window and in
+   the capture phase, so it sees every one of these first. A label's click
+   forwarded to its checkbox, Enter submitting a form, a screen reader's
+   activation — the browser marks all of those trusted. */
+['click', 'dblclick', 'input', 'change', 'keydown', 'keyup', 'submit',
+    'drop', 'dragstart', 'dragenter', 'dragover', 'dragend'].forEach((type) => {
+    window.addEventListener(type, (event) => {
+        if (event.isTrusted || selfEvent) return;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+    }, true);
+});
+
+const LOCAL_DEV = location.protocol === 'file:'
+    || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+if (!LOCAL_DEV) {
+    /* F12, Ctrl+Shift+I / J / C / K, Cmd+Option+I / J / C, and Ctrl+U for
+       the page source. By physical key, so a French keyboard is covered. */
+    window.addEventListener('keydown', (event) => {
+        const mod = event.ctrlKey || event.metaKey;
+        const tools = event.key === 'F12'
+            || (mod && (event.shiftKey || event.altKey) && ['KeyI', 'KeyJ', 'KeyC', 'KeyK'].includes(event.code))
+            || (mod && event.code === 'KeyU');
+        if (!tools) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }, true);
+
+    /* The right-click menu is where "Inspect" lives. It stays on in a text
+       field, where it is also where Paste lives, and on a touch screen,
+       where a long press has no Inspect in it and is how a picture is saved. */
+    const mouse = !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+    document.addEventListener('contextmenu', (event) => {
+        if (!mouse) return;
+        const el = event.target;
+        if (el && el.closest && el.closest('input, textarea, select, [contenteditable="true"]')) return;
+        event.preventDefault();
+    });
+
+    /* A debugger statement costs nothing when the developer tools are shut,
+       and stops the page when they are open. So a pause that took real time
+       means they are open, and the page is hidden until they are closed. */
+    const toolsOpen = () => {
+        const t = performance.now();
+        // eslint-disable-next-line no-debugger
+        debugger;
+        return performance.now() - t > 200;
+    };
+    setInterval(() => {
+        document.documentElement.classList.toggle('ps-shield', toolsOpen());
+    }, 1000);
+
+    /* The attack that works on a person rather than a page: "paste this
+       into the console and it will fix your plan". */
+    console.log('%cStop.', 'font: 700 40px system-ui, sans-serif; color: #c0392b;');
+    console.log('%cThis panel is a tool for developers. If somebody told you to paste something here, '
+        + 'it is a trick to get at your trips. Close it.', 'font: 16px system-ui, sans-serif;');
+}
+
+/* ====================================================================
+   PSApp — THE ONLY WAY IN FROM THE OTHER FILES
+
+   drive.js and gcal.js load after this one and need a handful of things
+   from it. They get copies, never the live records: a copy can be read,
+   changed and thrown away without touching a thing. The one call that
+   writes — replacing everything with a Drive copy — only goes through
+   while the page has a real click behind it, which is the Yes in the
+   dialog that asks first. Frozen, and nailed to window, so it cannot be
+   swapped for something else either.
+   ==================================================================== */
+const copyOf = (value) => JSON.parse(JSON.stringify(value));
+
+Object.defineProperty(window, 'PSApp', {
+    value: Object.freeze({
+        envelope: () => copyOf(psEnvelope()),
+        unwrap: (parsed) => psUnwrap(parsed),
+        summary: (bag) => psSummary(bag === undefined ? db : bag),
+        isEmpty: () => psIsEmpty(),
+        apply: (bag) => {
+            const ua = navigator.userActivation;
+            if (ua && !ua.isActive) return false;
+            psApply(psClean(bag));
+            return true;
+        },
+        ask: (title, body, then) => ask(String(title), String(body), typeof then === 'function' ? then : null),
+        toast: (message, action) => toast(message, action),
+        esc: (value) => esc(value),
+        calItems: () => copyOf(calItems()),
+        catOf: (id) => copyOf(catOf(id)),
+        shiftDate: (iso, by) => shiftDate(iso, by),
+    }),
+});
+
 document.addEventListener('DOMContentLoaded', boot);
+
+})();

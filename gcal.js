@@ -161,7 +161,7 @@
         const when = allDay
             ? {
                 start: { date: it.date },
-                end: { date: shiftDate(it.span ? it.until : it.date, 1) },
+                end: { date: PSApp.shiftDate(it.span ? it.until : it.date, 1) },
             }
             : {
                 start: { dateTime: it.date + 'T' + it.time + ':00', timeZone: zone },
@@ -170,7 +170,7 @@
 
         const out = Object.assign({
             id: gid(it),
-            summary: catOf(it.cat).mark + ' ' + it.title,
+            summary: PSApp.catOf(it.cat).mark + ' ' + it.title,
         }, when);
 
         /* Yearly entries go over as one recurring event, the same way
@@ -225,7 +225,7 @@
             /* Holidays are left out for the same reason they are left out of
                the .ics: Google already knows them, and its own holiday
                calendar would end up doubled. */
-            const items = calItems().filter((it) => it.src !== 'holiday' && !it.rep);
+            const items = PSApp.calItems().filter((it) => it.src !== 'holiday' && !it.rep);
 
             let added = 0;
             let updated = 0;
@@ -234,11 +234,11 @@
                 if (what === 'added') added++; else updated++;
             }
 
-            toast('Sent to your <b>' + esc(cfg.calendarName || 'PlanSphere') + '</b> calendar · '
+            PSApp.toast('Sent to your <b>' + PSApp.esc(cfg.calendarName || 'PlanSphere') + '</b> calendar · '
                 + added + ' added, ' + updated + ' updated.',
                 { label: 'Open', run: () => window.open('https://calendar.google.com/', '_blank', 'noopener') });
         } catch (err) {
-            toast('<b>Google Calendar:</b> ' + esc(err.message || String(err)));
+            PSApp.toast('<b>Google Calendar:</b> ' + PSApp.esc(err.message || String(err)));
         } finally {
             busy = false;
             paint();

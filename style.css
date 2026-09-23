@@ -4805,3 +4805,18 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: .85; }
    surrounding text rather than the category's, because it is a fact about
    the entry rather than another thing to look at. */
 .cal-rep { font-size: 11px; color: var(--ink-4); vertical-align: 1px; }
+
+/* The tamper guard's cover (see TAMPER GUARD in app.js). On the published
+   site the page hides itself while the developer tools are open, and says
+   why rather than going blank. */
+html.ps-shield body > * { display: none !important; }
+html.ps-shield body::before {
+    content: 'PlanSphere is hidden while the developer tools are open. Close them to carry on.';
+    display: block;
+    max-width: 32rem;
+    margin: 30vh auto 0;
+    padding: 0 16px;
+    text-align: center;
+    font: 600 1rem/1.5 system-ui, sans-serif;
+    color: var(--ink);
+}

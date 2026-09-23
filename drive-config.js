@@ -47,3 +47,6 @@ const PS_DRIVE = {
     /** The one file PlanSphere writes. Renaming it in Drive starts a new one. */
     filename: 'plansphere-data.json',
 };
+
+/* Frozen, so nothing can point the backup at somebody else's folder. */
+Object.freeze(PS_DRIVE);

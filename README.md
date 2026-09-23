@@ -46,6 +46,7 @@ can reuse the one MoneyFlow and FinSim already have. See
 | `drive-config.js` | Which Drive folder, and which OAuth client. No secrets. |
 | `serve.js` | A static file server and nothing else. |
 | `docs/SECURITY.md` | What the page guards against, what no web page can, and what only you can do. |
+| `docs/PROJECT_PROPOSAL.md` | The project proposal: problem, objectives, scope, requirements, architecture, plan and risks. A Word copy sits beside it. |
 | `gcal.js` | One-way push into Google Calendar. Inert until `gcal-config.js` has a client ID. |
 | `logo-icon.svg` | The mark, used in the sidebar and the rail. |
 | `brand/` | The full identity: lockups, single-colour cuts, app tile, and `identity.html`. |
